@@ -2,7 +2,7 @@
 
 Safe Rust bindings for Apple's [Photos](https://developer.apple.com/documentation/photos) framework on macOS.
 
-> **Status:** v0.1.0 covers practical `PHPhotoLibrary`, `PHAsset`, `PHFetchResult`, `PHAssetCollection`, `PHFetchOptions`, `PHImageManager`, `PHCachingImageManager`, `PHAssetResource`, change observers, and cancellable image/data requests.
+> **Status:** v0.2.0 covers `PHAsset`, `PHAssetCollection`, `PHCollectionList`, `PHPhotoLibrary`, `PHImageManager`, `PHFetchResult`, `PHChange`, `PHContentEditingInput`, `PHContentEditingOutput`, `PHObjectChangeDetails`, `PHFetchOptions`, `PHAssetCreationRequest`, `PHLivePhoto`, and `PHCloudIdentifier` through a multi-file Swift bridge.
 
 ## Quick start
 
@@ -13,49 +13,72 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let library = PHPhotoLibrary::shared()?;
     println!("status: {:?}", PHPhotoLibrary::authorization_status());
 
-    let collections = library.fetch_asset_collections(&PHFetchOptions::default())?;
-    println!("collections: {}", collections.len());
+    let assets = PHAsset::fetch(&PHFetchOptions::default())?;
+    println!("assets: {}", assets.len());
 
-    let assets = PHPhotoLibrary::fetch_assets(&PHFetchOptions::default())?;
     if let Some(asset) = assets.first() {
         let manager = PHImageManager::shared()?;
-        let request = manager.request_image(
+        let request = manager.request_image_data(
             asset,
-            PHImageRequest::new(320.0, 240.0, PHImageContentMode::AspectFit),
+            &PHImageRequest::new(320.0, 240.0, PHImageContentMode::AspectFit),
         )?;
-        let image = request.wait(5_000)?;
-        println!("image bytes: {}", image.tiff_data().len());
+        let image = request.wait(10_000)?;
+        println!("image bytes: {}", image.data().len());
     }
 
+    let _ = library.fetch_asset_collections(&PHFetchOptions::default())?;
     Ok(())
 }
 ```
 
 ## Highlights
 
-- `PHPhotoLibrary::authorization_status`, `request_authorization`, `register_change_observer`
-- `PHFetchOptions` with predicate, sort descriptors, and fetch limits
-- `PHAsset` snapshots for dates, size, location, media type/subtypes, duration, and favorite state
-- `PHImageManager` / `PHCachingImageManager` with cancellable request handles for image, image-data, and basic live-photo lookups
-- `PHAssetResource::for_asset` for original filename / resource metadata
-- `PHFetchResult<T>` convenience wrapper with `len`, `iter`, and `first`
+- `PHPhotoLibrary` authorization helpers plus summary/detailed change observers.
+- `PHAsset`, `PHAssetCollection`, and `PHCollectionList` fetch helpers with editable capability checks.
+- `PHFetchOptions` and `PHFetchResult<T>` convenience wrappers for filtering and iteration.
+- `PHImageManager` / `PHCachingImageManager` request handles for images, image data, live photos, and caching.
+- `PHContentEditingInput` / `PHContentEditingOutput` handles for non-destructive editing workflows.
+- `PHAssetCreationRequest` builder-style asset creation helpers.
+- `PHCloudIdentifier` batch lookup helpers for local/cloud identifier mapping.
 
-## Authorization
+## Coverage audit
 
-The smoke example never prompts for Photos access. It reports the current authorization state and only performs non-interactive library queries.
+See [`COVERAGE.md`](COVERAGE.md) for the framework audit, implemented rows, partial rows, and deferred macOS-unavailable or deprecated APIs.
 
-## Smoke example
+## Examples
 
-Run the framework smoke test with:
+The crate ships with numbered examples covering every logical area:
+
+- `01_photokit_smoke`
+- `02_phasset_fetch`
+- `03_phasset_collection_fetch`
+- `04_phcollection_list_fetch`
+- `05_phphoto_library_authorization`
+- `06_phimage_manager_requests`
+- `07_phfetch_result_methods`
+- `08_phchange_observer`
+- `09_phcontent_editing_input`
+- `10_phcontent_editing_output`
+- `11_phobject_change_details`
+- `12_phfetch_options_builder`
+- `13_phasset_creation_request`
+- `14_phlive_photo`
+- `15_phcloud_identifier`
+
+Run them with:
 
 ```bash
-cargo run --all-features --example 01_photokit_smoke
+for ex in examples/*.rs; do
+  cargo run --example "$(basename "$ex" .rs)"
+done
 ```
 
-Expected success footer:
+## Verification
 
-```text
-✅ photokit OK
+```bash
+cargo clippy --all-targets -- -D warnings
+cargo test
+for ex in examples/*.rs; do cargo run --example "$(basename "$ex" .rs)"; done
 ```
 
 ## License

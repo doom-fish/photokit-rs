@@ -15,33 +15,87 @@
     clippy::type_complexity
 )]
 
+pub mod asset;
+pub mod asset_collection;
+pub mod asset_creation_request;
+pub mod change;
+pub mod cloud_identifier;
+pub mod collection_list;
+pub mod content_editing_input;
+pub mod content_editing_output;
 pub mod error;
+pub mod fetch_options;
+pub mod fetch_result;
 mod ffi;
+pub mod image_manager;
 pub mod library;
+pub mod live_photo;
+pub mod object_change_details;
 mod private;
+pub mod photo_library;
 pub mod types;
 
+pub use asset::{
+    PHAsset, PHAssetEditOperation, PHAssetPlaybackStyle, PHAssetResource, PHCoordinate,
+    PHMediaType,
+};
+pub use asset_collection::{PHAssetCollection, PHAssetCollectionType, PHCollectionEditOperation};
+pub use asset_creation_request::{
+    PHAssetCreationRequest, PHAssetCreationResource, PHAssetResourceCreationOptions,
+};
+pub use change::PHChange;
+pub use cloud_identifier::{PHCloudIdentifier, PHCloudIdentifierMapping, PHLocalIdentifierMapping};
+pub use collection_list::{PHCollectionList, PHCollectionListType};
+pub use content_editing_input::{
+    PHAdjustmentData, PHContentEditingInput, PHContentEditingInputInfo,
+    PHContentEditingInputRequestOptions,
+};
+pub use content_editing_output::{PHContentEditingOutput, PHContentEditingOutputInfo};
 pub use error::{NSErrorInfo, PHAuthorizationStatus, PhotoKitError};
-pub use library::{
-    PHCachingImageManager, PHChangeObserver, PHImageDataRequestHandle, PHImageManager,
-    PHImageRequestHandle, PHLivePhotoRequestHandle, PHPhotoLibrary,
+pub use fetch_options::{PHFetchOptions, PHSortDescriptor};
+pub use fetch_result::PHFetchResult;
+pub use image_manager::{
+    PHCachingImageManager, PHImageContentMode, PHImageDataRequestHandle, PHImageDataResult,
+    PHImageManager, PHImageRequest, PHImageRequestHandle, PHImageRequestOptionsDeliveryMode,
+    PHImageRequestOptionsResizeMode, PHImageRequestOptionsVersion, PHImageResult,
+    PHLivePhotoRequestHandle,
 };
-pub use types::{
-    PHAsset, PHAssetCollection, PHAssetCollectionType, PHAssetResource, PHCoordinate,
-    PHFetchOptions, PHFetchResult, PHImageContentMode, PHImageDataResult, PHImageRequest,
-    PHImageResult, PHLivePhotoResult, PHMediaType, PHPhotoLibraryChange, PHSortDescriptor,
-};
+pub use live_photo::{PHLivePhoto, PHLivePhotoResult};
+pub use object_change_details::PHObjectChangeDetails;
+pub use photo_library::{PHAccessLevel, PHChangeObserver, PHPhotoLibrary, PHPhotoLibraryChange};
 
 /// Common imports.
 pub mod prelude {
+    pub use crate::asset::{
+        PHAsset, PHAssetEditOperation, PHAssetPlaybackStyle, PHAssetResource, PHCoordinate,
+        PHMediaType,
+    };
+    pub use crate::asset_collection::{
+        PHAssetCollection, PHAssetCollectionType, PHCollectionEditOperation,
+    };
+    pub use crate::asset_creation_request::{
+        PHAssetCreationRequest, PHAssetCreationResource, PHAssetResourceCreationOptions,
+    };
+    pub use crate::change::PHChange;
+    pub use crate::cloud_identifier::{
+        PHCloudIdentifier, PHCloudIdentifierMapping, PHLocalIdentifierMapping,
+    };
+    pub use crate::collection_list::{PHCollectionList, PHCollectionListType};
+    pub use crate::content_editing_input::{
+        PHAdjustmentData, PHContentEditingInput, PHContentEditingInputInfo,
+        PHContentEditingInputRequestOptions,
+    };
+    pub use crate::content_editing_output::{PHContentEditingOutput, PHContentEditingOutputInfo};
     pub use crate::error::{NSErrorInfo, PHAuthorizationStatus, PhotoKitError};
-    pub use crate::library::{
-        PHCachingImageManager, PHChangeObserver, PHImageDataRequestHandle, PHImageManager,
-        PHImageRequestHandle, PHLivePhotoRequestHandle, PHPhotoLibrary,
+    pub use crate::fetch_options::{PHFetchOptions, PHSortDescriptor};
+    pub use crate::fetch_result::PHFetchResult;
+    pub use crate::image_manager::{
+        PHCachingImageManager, PHImageContentMode, PHImageDataRequestHandle, PHImageDataResult,
+        PHImageManager, PHImageRequest, PHImageRequestHandle,
+        PHImageRequestOptionsDeliveryMode, PHImageRequestOptionsResizeMode,
+        PHImageRequestOptionsVersion, PHImageResult, PHLivePhotoRequestHandle,
     };
-    pub use crate::types::{
-        PHAsset, PHAssetCollection, PHAssetCollectionType, PHAssetResource, PHCoordinate,
-        PHFetchOptions, PHFetchResult, PHImageContentMode, PHImageDataResult, PHImageRequest,
-        PHImageResult, PHLivePhotoResult, PHMediaType, PHPhotoLibraryChange, PHSortDescriptor,
-    };
+    pub use crate::live_photo::{PHLivePhoto, PHLivePhotoResult};
+    pub use crate::object_change_details::PHObjectChangeDetails;
+    pub use crate::photo_library::{PHAccessLevel, PHChangeObserver, PHPhotoLibrary, PHPhotoLibraryChange};
 }

@@ -24,12 +24,14 @@ public func pkrRetain<T: AnyObject>(_ object: T) -> UnsafeMutableRawPointer {
 
 @inline(__always)
 public func pkrBorrow<T: AnyObject>(_ ptr: UnsafeMutableRawPointer, as _: T.Type = T.self) -> T {
-    Unmanaged<T>.fromOpaque(ptr).takeUnretainedValue()
+    let typed = ptr.assumingMemoryBound(to: T.self)
+    return Unmanaged<T>.fromOpaque(UnsafeRawPointer(typed)).takeUnretainedValue()
 }
 
 @inline(__always)
 public func pkrRelease(_ ptr: UnsafeMutableRawPointer) {
-    Unmanaged<AnyObject>.fromOpaque(ptr).release()
+    let typed = ptr.assumingMemoryBound(to: UInt8.self)
+    Unmanaged<AnyObject>.fromOpaque(UnsafeRawPointer(typed)).release()
 }
 
 public struct PKRErrorPayload: Codable {
@@ -43,8 +45,6 @@ private let pkrFractionalDateFormatter: ISO8601DateFormatter = {
     formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
     return formatter
 }()
-
-private let pkrPlainDateFormatter = ISO8601DateFormatter()
 
 public func pkrDateString(_ date: Date?) -> String? {
     guard let date else { return nil }
