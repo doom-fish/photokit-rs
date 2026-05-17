@@ -3,6 +3,7 @@ use std::ffi::CStr;
 use std::ops::Deref;
 use std::ptr::{self, NonNull};
 
+use doom_fish_utils::panic_safe::catch_user_panic;
 use serde::{Deserialize, Serialize};
 
 use crate::content_editing_input::PHContentEditingInput;
@@ -112,9 +113,13 @@ impl PHLivePhotoEditingContext {
     {
         self.clear_frame_processor();
         let callback: Box<FrameProcessorCallback> = Box::new(callback);
+        // SAFETY: `Box::into_raw` never returns null, so `NonNull::new_unchecked` is safe.
         let user_info =
             unsafe { NonNull::new_unchecked(Box::into_raw(Box::new(callback)).cast::<c_void>()) };
         let mut error = ptr::null_mut();
+        // SAFETY: `self.raw` is a valid editing context pointer; the trampoline
+        // is a valid `extern "C"` fn; `user_info` is a live allocation managed
+        // by `self.frame_processor_user_info`.
         let status = unsafe {
             ffi::ph_live_photo_editing_context_set_frame_processor(
                 self.raw.as_ptr(),
@@ -127,18 +132,26 @@ impl PHLivePhotoEditingContext {
             self.frame_processor_user_info = Some(user_info);
             Ok(())
         } else {
+            // SAFETY: Setting the processor failed; `user_info` was never passed
+            // to the Swift bridge, so this is the only `from_raw` call on it.
             unsafe {
                 drop(Box::from_raw(
                     user_info.as_ptr().cast::<Box<FrameProcessorCallback>>(),
                 ));
             }
+            // SAFETY: `error` is a non-null pointer set by the Swift bridge on failure.
             Err(unsafe { PhotoKitError::from_error_ptr(error, "set frame processor failed") })
         }
     }
 
     pub fn clear_frame_processor(&mut self) {
+        // SAFETY: `self.raw` is a valid editing context pointer.
         unsafe { ffi::ph_live_photo_editing_context_clear_frame_processor(self.raw.as_ptr()) };
         if let Some(user_info) = self.frame_processor_user_info.take() {
+            // SAFETY: `user_info` was created from `Box<Box<FrameProcessorCallback>>`
+            // via `Box::into_raw`.  After `clear_frame_processor` above the Swift
+            // bridge will no longer invoke the trampoline, so this is the only
+            // `from_raw` call on this pointer.
             unsafe {
                 drop(Box::from_raw(
                     user_info.as_ptr().cast::<Box<FrameProcessorCallback>>(),
@@ -247,13 +260,20 @@ unsafe extern "C" fn live_photo_frame_processor_trampoline(
         return 0;
     }
 
+    // SAFETY: `frame_json` is a valid NUL-terminated C string from the Swift bridge.
     let frame_json = CStr::from_ptr(frame_json).to_string_lossy();
     let Ok(frame) = serde_json::from_str::<PHLivePhotoFrame>(&frame_json) else {
         return 0;
     };
+    // SAFETY: `user_info` is a `Box<Box<FrameProcessorCallback>>` kept alive by
+    // the `PHLivePhotoEditingContext` that owns this registration.
     let callback = &mut **user_info.cast::<Box<FrameProcessorCallback>>();
-    match callback(frame) {
-        PHLivePhotoFrameProcessingDecision::KeepOriginal => 0,
-        PHLivePhotoFrameProcessingDecision::SkipFrame => 1,
-    }
+    let mut decision = 0i32;
+    catch_user_panic("live_photo_frame_processor_trampoline", || {
+        decision = match callback(frame) {
+            PHLivePhotoFrameProcessingDecision::KeepOriginal => 0,
+            PHLivePhotoFrameProcessingDecision::SkipFrame => 1,
+        };
+    });
+    decision
 }

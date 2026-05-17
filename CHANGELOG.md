@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.3.2 - 2026-06-10
+
+- **Async/unsafe audit (quality pass)**
+  - Added `catch_user_panic` guards (from `doom-fish-utils::panic_safe`) to all
+    three `extern "C"` trampolines that invoke user-supplied closures
+    (`change_observer_trampoline`, `availability_observer_trampoline`,
+    `live_photo_frame_processor_trampoline`).  A panic crossing the FFI
+    boundary into Swift is undefined behaviour; it is now caught and logged.
+  - Added `// SAFETY:` doc comments to every `Box::from_raw`,
+    `Box::into_raw`, and `NonNull::new_unchecked` call site in
+    `photo_library.rs` and `live_photo_editing_context.rs`.
+  - Widened the `doom-fish-utils` version constraint from `"0.1"` to
+    `">=0.1, <0.3"` to permit the next minor release without a breaking
+    Cargo.toml edit.
+
 ## 0.3.1 - 2026-06-10
 
 - Availability sweep: audited all Photos.framework symbols against the macOS 26

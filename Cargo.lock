@@ -10,7 +10,7 @@ checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
 name = "doom-fish-utils"
-version = "0.1.0"
+version = "0.1.1"
 
 [[package]]
 name = "itoa"
@@ -26,7 +26,7 @@ checksum = "f8ca58f447f06ed17d5fc4043ce1b10dd205e060fb3ce5b979b8ed8e59ff3f79"
 
 [[package]]
 name = "photokit"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "base64",
  "doom-fish-utils",

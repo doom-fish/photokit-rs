@@ -1,6 +1,7 @@
 use core::ffi::{c_char, c_void};
 use std::ptr::{self, NonNull};
 
+use doom_fish_utils::panic_safe::catch_user_panic;
 use serde::{Deserialize, Serialize};
 
 use crate::asset::PHAsset;
@@ -146,6 +147,9 @@ impl PHPhotoLibrary {
     where
         F: Fn(PHPhotoLibraryAvailabilityChange) + Send + 'static,
     {
+        // SAFETY: `Box::into_raw` produces a valid, non-null pointer.
+        // The box is immediately wrapped in `NonNull::new_unchecked`, which is
+        // safe because `Box::into_raw` never returns null.
         let user_info = unsafe {
             NonNull::new_unchecked(
                 Box::into_raw(Box::new(Box::new(callback) as Box<AvailabilityCallback>))
@@ -153,6 +157,9 @@ impl PHPhotoLibrary {
             )
         };
         let mut error = ptr::null_mut();
+        // SAFETY: `self.raw` is a valid PHPhotoLibrary pointer, the trampoline
+        // function pointer is a valid `extern "C"` fn, and `user_info` is a
+        // live heap allocation whose lifetime is managed by `PHAvailabilityObserver`.
         let raw = unsafe {
             ffi::ph_photo_library_register_availability_observer(
                 self.raw.as_ptr(),
@@ -164,11 +171,14 @@ impl PHPhotoLibrary {
         if let Some(raw) = NonNull::new(raw) {
             Ok(PHAvailabilityObserver { raw, user_info })
         } else {
+            // SAFETY: Registration failed; `user_info` was never handed to the
+            // Swift bridge so this is the only `from_raw` call on this pointer.
             unsafe {
                 drop(Box::from_raw(
                     user_info.as_ptr().cast::<Box<AvailabilityCallback>>(),
                 ));
             }
+            // SAFETY: `error` is a non-null pointer set by the Swift bridge on failure.
             Err(unsafe {
                 PhotoKitError::from_error_ptr(error, "register availability observer failed")
             })
@@ -213,9 +223,13 @@ impl PHPhotoLibrary {
         &self,
         callback: ChangeCallbackKind,
     ) -> Result<PHChangeObserver, PhotoKitError> {
+        // SAFETY: `Box::into_raw` produces a valid, non-null pointer.
         let user_info =
             unsafe { NonNull::new_unchecked(Box::into_raw(Box::new(callback)).cast::<c_void>()) };
         let mut error = ptr::null_mut();
+        // SAFETY: `self.raw` is a valid PHPhotoLibrary pointer, the trampoline
+        // is a valid `extern "C"` fn, and `user_info` is a live heap allocation
+        // whose lifetime is managed by `PHChangeObserver`.
         let raw = unsafe {
             ffi::ph_photo_library_register_change_observer(
                 self.raw.as_ptr(),
@@ -228,11 +242,14 @@ impl PHPhotoLibrary {
         if let Some(raw) = NonNull::new(raw) {
             Ok(PHChangeObserver { raw, user_info })
         } else {
+            // SAFETY: Registration failed; `user_info` was never handed to the
+            // Swift bridge so this is the only `from_raw` call on this pointer.
             unsafe {
                 drop(Box::from_raw(
                     user_info.as_ptr().cast::<ChangeCallbackKind>(),
                 ));
             }
+            // SAFETY: `error` is a non-null pointer set by the Swift bridge on failure.
             Err(unsafe { PhotoKitError::from_error_ptr(error, "registerChangeObserver failed") })
         }
     }
@@ -257,7 +274,12 @@ impl core::fmt::Debug for PHChangeObserver {
 
 impl Drop for PHChangeObserver {
     fn drop(&mut self) {
+        // SAFETY: `self.raw` is a valid observer handle registered with the
+        // Swift bridge; unregister before freeing the callback storage below.
         unsafe { ffi::ph_photo_library_unregister_change_observer(self.raw.as_ptr()) };
+        // SAFETY: `self.user_info` was created from a `Box<ChangeCallbackKind>`
+        // via `Box::into_raw` and this is the only `from_raw` call on it (the
+        // Swift bridge never calls `from_raw`; the trampoline only borrows it).
         unsafe {
             drop(Box::from_raw(
                 self.user_info.as_ptr().cast::<ChangeCallbackKind>(),
@@ -280,7 +302,12 @@ impl core::fmt::Debug for PHAvailabilityObserver {
 
 impl Drop for PHAvailabilityObserver {
     fn drop(&mut self) {
+        // SAFETY: `self.raw` is a valid observer handle; unregister first so
+        // the Swift bridge can no longer call the trampoline before we free
+        // the callback storage below.
         unsafe { ffi::ph_photo_library_unregister_availability_observer(self.raw.as_ptr()) };
+        // SAFETY: `self.user_info` was created from `Box<Box<AvailabilityCallback>>`
+        // via `Box::into_raw` and this is the only `from_raw` call on it.
         unsafe {
             drop(Box::from_raw(
                 self.user_info.as_ptr().cast::<Box<AvailabilityCallback>>(),
@@ -290,17 +317,31 @@ impl Drop for PHAvailabilityObserver {
 }
 
 unsafe extern "C" fn change_observer_trampoline(change: *mut c_void, user_info: *mut c_void) {
+    // SAFETY: `user_info` is a `Box<ChangeCallbackKind>` kept alive by the
+    // `PHChangeObserver` that owns this callback registration.  The trampoline
+    // only borrows it; the box is freed in `PHChangeObserver::drop` after
+    // `ph_photo_library_unregister_change_observer` returns.
     let callback = &*(user_info.cast::<ChangeCallbackKind>());
     match callback {
         ChangeCallbackKind::Summary(callback) => {
             if let Some(change) = NonNull::new(change) {
+                // SAFETY: `change` is a valid PHChange pointer provided by the
+                // Photos framework; `PHChange::from_raw` takes ownership and
+                // we drop it immediately since the summary callback does not
+                // expose the raw change object.
                 drop(PHChange::from_raw(change.as_ptr()));
             }
-            callback(PHPhotoLibraryChange { change_count: 1 });
+            catch_user_panic("change_observer_trampoline(summary)", || {
+                callback(PHPhotoLibraryChange { change_count: 1 });
+            });
         }
         ChangeCallbackKind::Detailed(callback) => {
             if let Some(change) = NonNull::new(change) {
-                callback(PHChange::from_raw(change.as_ptr()));
+                // SAFETY: `change` is a valid PHChange pointer from Photos.
+                let change_obj = PHChange::from_raw(change.as_ptr());
+                catch_user_panic("change_observer_trampoline(detailed)", || {
+                    callback(change_obj);
+                });
             }
         }
     }
@@ -314,6 +355,8 @@ unsafe extern "C" fn availability_observer_trampoline(
         return;
     }
 
+    // SAFETY: `user_info` is a `Box<Box<AvailabilityCallback>>` kept alive by
+    // the `PHAvailabilityObserver` that owns this registration.
     let callback = &mut **user_info.cast::<Box<AvailabilityCallback>>();
     let payload = if payload_json.is_null() {
         PHPhotoLibraryAvailabilityChange::default()
@@ -322,5 +365,7 @@ unsafe extern "C" fn availability_observer_trampoline(
     } else {
         PHPhotoLibraryAvailabilityChange::default()
     };
-    callback(payload);
+    catch_user_panic("availability_observer_trampoline", || {
+        callback(payload);
+    });
 }
