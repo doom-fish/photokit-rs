@@ -175,8 +175,18 @@ func pkrEncodeResource(_ resource: PHAssetResource) -> PKRAssetResourcePayload {
             }
             return nil
         }(),
-        pixelWidth: resource.responds(to: Selector(("pixelWidth"))) ? resource.pixelWidth : nil,
-        pixelHeight: resource.responds(to: Selector(("pixelHeight"))) ? resource.pixelHeight : nil
+        pixelWidth: {
+            if #available(macOS 13.0, *) {
+                return resource.pixelWidth
+            }
+            return nil
+        }(),
+        pixelHeight: {
+            if #available(macOS 13.0, *) {
+                return resource.pixelHeight
+            }
+            return nil
+        }()
     )
 }
 

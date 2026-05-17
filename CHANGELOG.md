@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.3.1 - 2026-06-10
+
+- Availability sweep: audited all Photos.framework symbols against the macOS 26
+  SDK headers and confirmed `@available`/`#available` guards are in place for
+  every macOS 26-only property used in the Swift bridge:
+  - `PHAsset.addedDate` (macOS 26) — guarded in `pkrEncodeAsset`
+  - `PHAsset.contentType` (macOS 26) — guarded in `pkrEncodeAsset`
+  - `PHAssetResource.contentType` (macOS 26) — guarded in `pkrEncodeResource`
+  - `PHContentEditingInput.contentType` (macOS 26) — guarded in
+    `pkrEncodeContentEditingInput`
+  - `PHAssetResourceCreationOptions.contentType` (macOS 26) — guarded in
+    `pkrAssetResourceCreationOptions`
+- Replaced Objective-C runtime selector probe for `PHAssetResource.pixelWidth`
+  / `pixelHeight` (macOS 13+) with idiomatic `if #available(macOS 13.0, *)`
+  guards.
+
 ## 0.3.0 - 2026-05-17
 
 - Added `async_api` module (gated behind `async` feature) — Tier-1 async wrappers for:
