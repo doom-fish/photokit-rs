@@ -197,6 +197,10 @@ impl PHLivePhotoEditingContext {
         unsafe { ffi::ph_live_photo_editing_context_cancel(self.raw.as_ptr()) };
     }
 
+    pub(crate) fn as_raw(&self) -> *mut c_void {
+        self.raw.as_ptr()
+    }
+
     fn refresh_info(&mut self) -> Result<(), PhotoKitError> {
         let mut error = ptr::null_mut();
         let payload =

@@ -2,7 +2,7 @@
 
 Safe Rust bindings for Apple's [Photos](https://developer.apple.com/documentation/photos) framework on macOS.
 
-> **Status:** v0.2.1 closes the symbol-level Photos.framework audit at 100% coverage, adding `PHAssetResourceManager`, generic `PHCollection`/`PHChangeRequest` mutation APIs, persistent change history, `PHLivePhotoEditingContext`, video requests, project wrappers, and typed Photos constants/errors.
+> **Status:** v0.3.0 adds the Tier-1 `async_api` module on top of the fully audited Photos.framework surface, with executor-agnostic futures for authorization, `performChanges`, image requests, and live-photo editing callbacks.
 
 ## Quick start
 
@@ -30,6 +30,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 ```
+
+## Async API
+
+Enable the `async` feature to access non-blocking wrappers for Photos.framework completion-handler APIs:
+
+```toml
+[dependencies]
+photokit = { version = "0.3", features = ["async"] }
+```
+
+```rust
+use photokit::async_api::AsyncPHPhotoLibrary;
+use photokit::PHAccessLevel;
+
+# async fn demo() -> Result<(), Box<dyn std::error::Error>> {
+let status = AsyncPHPhotoLibrary::request_authorization(PHAccessLevel::ReadWrite).await?;
+# Ok(())
+# }
+```
+
+All async types implement `std::future::Future` and are executor-agnostic.
+See [`async_api`](src/async_api.rs) for the full API surface.
 
 ## Highlights
 
@@ -64,21 +86,34 @@ The crate ships with numbered examples covering every logical area:
 - `13_phasset_creation_request`
 - `14_phlive_photo`
 - `15_phcloud_identifier`
+- `16_async_api` *(requires `--features async`)*
 
 Run them with:
 
 ```bash
 for ex in examples/*.rs; do
-  cargo run --example "$(basename "$ex" .rs)"
+  name="$(basename "$ex" .rs)"
+  if [ "$name" = "16_async_api" ]; then
+    cargo run --example "$name" --features async
+  else
+    cargo run --example "$name"
+  fi
 done
 ```
 
 ## Verification
 
 ```bash
-cargo clippy --all-targets -- -D warnings
-cargo test
-for ex in examples/*.rs; do cargo run --example "$(basename "$ex" .rs)"; done
+cargo clippy --all-features --all-targets -- -D warnings
+cargo test --all-features
+for ex in examples/*.rs; do
+  name="$(basename "$ex" .rs)"
+  if [ "$name" = "16_async_api" ]; then
+    cargo run --example "$name" --features async
+  else
+    cargo run --example "$name"
+  fi
+done
 ```
 
 ## License

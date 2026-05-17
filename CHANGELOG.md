@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.0 - 2026-05-17
+
+- Added `async_api` module (gated behind `async` feature) — Tier-1 async wrappers for:
+  - `PHPhotoLibrary.requestAuthorization(for:handler:)` → `AsyncPHPhotoLibrary::request_authorization`
+  - `PHPhotoLibrary.performChanges(_:completionHandler:)` → `AsyncPHPhotoLibrary::perform_asset_change` / `perform_collection_change` / `perform_collection_list_change`
+  - `PHAssetChangeRequest`, `PHAssetCollectionChangeRequest`, `PHCollectionListChangeRequest` — async wrappers via `AsyncPHPhotoLibrary`
+  - `PHImageManager.requestImage(for:)` → `AsyncPHImageManager::request_image` (one-shot Future, final delivery)
+  - `PHImageManager.requestImageDataAndOrientation(for:)` → `AsyncPHImageManager::request_image_data`
+  - `PHLivePhotoEditingContext.saveLivePhoto(to:options:completionHandler:)` → `AsyncPHLivePhotoEditingContext::save_live_photo`
+  - `PHLivePhotoEditingContext.prepareLivePhotoForPlayback(withTargetSize:)` → `AsyncPHLivePhotoEditingContext::prepare_live_photo`
+- All futures are executor-agnostic (no tokio/async-std dependency).
+- Added `doom-fish-utils` dependency for `AsyncCompletion`/`AsyncCompletionFuture`.
+- Added 1 async example (`16_async_api`) and async API integration tests.
+
 ## 0.2.1 - 2026-05-17
 
 - Closed the remaining symbol-level Photos.framework audit gaps and reached 100% audited coverage on macOS.

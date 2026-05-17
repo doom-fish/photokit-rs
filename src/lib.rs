@@ -21,6 +21,8 @@ pub mod asset_collection;
 pub mod asset_collection_change_request;
 pub mod asset_creation_request;
 pub mod asset_resource_manager;
+#[cfg(feature = "async")]
+pub mod async_api;
 pub mod change;
 pub mod change_request;
 pub mod cloud_identifier;

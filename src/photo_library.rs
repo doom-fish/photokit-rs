@@ -36,7 +36,7 @@ pub enum PHAccessLevel {
 }
 
 impl PHAccessLevel {
-    const fn as_raw(self) -> i32 {
+    pub(crate) const fn as_raw(self) -> i32 {
         match self {
             Self::AddOnly => 1,
             Self::ReadWrite => 2,
