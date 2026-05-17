@@ -25,6 +25,33 @@ impl PHCollectionListType {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(transparent)]
+pub struct PHCollectionListSubtype(pub i64);
+
+impl PHCollectionListSubtype {
+    pub const REGULAR_FOLDER: Self = Self(100);
+    pub const SMART_FOLDER_EVENTS: Self = Self(200);
+    pub const SMART_FOLDER_FACES: Self = Self(201);
+    pub const ANY: Self = Self(i64::MAX);
+
+    pub const fn raw_value(self) -> i64 {
+        self.0
+    }
+}
+
+impl From<i64> for PHCollectionListSubtype {
+    fn from(value: i64) -> Self {
+        Self(value)
+    }
+}
+
+impl From<PHCollectionListSubtype> for i64 {
+    fn from(value: PHCollectionListSubtype) -> Self {
+        value.0
+    }
+}
+
 #[allow(clippy::unsafe_derive_deserialize)]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -32,7 +59,7 @@ pub struct PHCollectionList {
     pub local_identifier: String,
     pub localized_title: Option<String>,
     pub collection_list_type: PHCollectionListType,
-    pub collection_list_subtype: i64,
+    pub collection_list_subtype: PHCollectionListSubtype,
     pub start_date: Option<String>,
     pub end_date: Option<String>,
     #[serde(default)]
@@ -101,15 +128,16 @@ impl PHCollectionList {
 
     pub fn fetch_with_type(
         collection_list_type: PHCollectionListType,
-        collection_list_subtype: i64,
+        collection_list_subtype: impl Into<PHCollectionListSubtype>,
         fetch_options: &PHFetchOptions,
     ) -> Result<PHFetchResult<Self>, PhotoKitError> {
         let options_json = json_cstring(fetch_options, "PHFetchOptions")?;
+        let collection_list_subtype = collection_list_subtype.into();
         let mut error = ptr::null_mut();
         let payload = unsafe {
             ffi::ph_collection_list_fetch_with_type_json(
                 collection_list_type.as_raw(),
-                collection_list_subtype,
+                collection_list_subtype.raw_value(),
                 options_json.as_ptr(),
                 &mut error,
             )
@@ -152,7 +180,10 @@ impl PHCollectionList {
             Ok(allowed != 0)
         } else {
             Err(unsafe {
-                PhotoKitError::from_error_ptr(error, "collection list edit capability lookup failed")
+                PhotoKitError::from_error_ptr(
+                    error,
+                    "collection list edit capability lookup failed",
+                )
             })
         }
     }

@@ -17,7 +17,9 @@ fn cloud_identifier_mapping_smoke() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     };
 
-    let mappings = library.cloud_identifier_mappings_for_local_identifiers(std::slice::from_ref(&asset.local_identifier))?;
+    let mappings = library.cloud_identifier_mappings_for_local_identifiers(
+        std::slice::from_ref(&asset.local_identifier),
+    )?;
     assert!(mappings.contains_key(&asset.local_identifier));
     Ok(())
 }

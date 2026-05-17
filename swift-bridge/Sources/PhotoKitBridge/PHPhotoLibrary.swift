@@ -12,6 +12,86 @@ final class PKRPhotoLibraryBox: NSObject {
 
 public typealias PKRChangeObserverCallback = @convention(c) (UnsafeMutableRawPointer?, UnsafeMutableRawPointer?) -> Void
 
+public typealias PKRAvailabilityObserverCallback = @convention(c) (UnsafeMutablePointer<CChar>?, UnsafeMutableRawPointer?) -> Void
+
+final class PKRAvailabilityObserverBox: NSObject, PHPhotoLibraryAvailabilityObserver {
+    let library: PHPhotoLibrary
+    let callback: PKRAvailabilityObserverCallback
+    let userInfo: UnsafeMutableRawPointer?
+
+    init(
+        library: PHPhotoLibrary,
+        callback: @escaping PKRAvailabilityObserverCallback,
+        userInfo: UnsafeMutableRawPointer?
+    ) {
+        self.library = library
+        self.callback = callback
+        self.userInfo = userInfo
+        super.init()
+    }
+
+    func photoLibraryDidBecomeUnavailable(_ photoLibrary: PHPhotoLibrary) {
+        let payload = PHPhotoLibraryAvailabilityChangePayload(
+            unavailabilityReason: photoLibrary.unavailabilityReason.map(pkrErrorPayload)
+        )
+        let json = try? pkrEncodeJSON(payload)
+        callback(json.flatMap(pkrCString), userInfo)
+    }
+}
+
+struct PHPhotoLibraryAvailabilityChangePayload: Codable {
+    var unavailabilityReason: PKRErrorPayload?
+}
+
+struct PKRPersistentChangeTokenPayload: Codable {
+    var dataBase64: String
+}
+
+struct PKRPersistentObjectChangeDetailsPayload: Codable {
+    var objectType: Int
+    var insertedLocalIdentifiers: [String]
+    var updatedLocalIdentifiers: [String]
+    var deletedLocalIdentifiers: [String]
+}
+
+struct PKRPersistentChangePayload: Codable {
+    var changeToken: PKRPersistentChangeTokenPayload
+    var changeDetails: [PKRPersistentObjectChangeDetailsPayload]
+}
+
+struct PKRPersistentChangeFetchResultPayload: Codable {
+    var changes: [PKRPersistentChangePayload]
+}
+
+func pkrEncodePersistentChangeToken(_ token: PHPersistentChangeToken) throws -> PKRPersistentChangeTokenPayload {
+    let data = try NSKeyedArchiver.archivedData(withRootObject: token, requiringSecureCoding: true)
+    return PKRPersistentChangeTokenPayload(dataBase64: data.base64EncodedString())
+}
+
+func pkrDecodePersistentChangeToken(_ payload: PKRPersistentChangeTokenPayload) throws -> PHPersistentChangeToken {
+    guard let data = Data(base64Encoded: payload.dataBase64),
+          let token = try NSKeyedUnarchiver.unarchivedObject(ofClass: PHPersistentChangeToken.self, from: data)
+    else {
+        throw NSError(domain: "photokit-rs", code: -1, userInfo: [NSLocalizedDescriptionKey: "invalid persistent change token"])
+    }
+    return token
+}
+
+func pkrEncodePersistentChange(_ change: PHPersistentChange) throws -> PKRPersistentChangePayload {
+    var details: [PKRPersistentObjectChangeDetailsPayload] = []
+    for objectType in [PHObjectType.asset, .assetCollection, .collectionList] {
+        if let objectDetails = try? change.changeDetails(for: objectType) {
+            details.append(PKRPersistentObjectChangeDetailsPayload(
+                objectType: objectDetails.objectType.rawValue,
+                insertedLocalIdentifiers: Array(objectDetails.insertedLocalIdentifiers).sorted(),
+                updatedLocalIdentifiers: Array(objectDetails.updatedLocalIdentifiers).sorted(),
+                deletedLocalIdentifiers: Array(objectDetails.deletedLocalIdentifiers).sorted()
+            ))
+        }
+    }
+    return PKRPersistentChangePayload(changeToken: try pkrEncodePersistentChangeToken(change.changeToken), changeDetails: details)
+}
+
 final class PKRChangeObserverBox: NSObject, PHPhotoLibraryChangeObserver {
     let library: PHPhotoLibrary
     let callback: PKRChangeObserverCallback
@@ -162,4 +242,101 @@ public func ph_photo_library_unregister_change_observer(_ observer: UnsafeMutabl
     let box = pkrBorrow(observer, as: PKRChangeObserverBox.self)
     box.library.unregisterChangeObserver(box)
     pkrRelease(observer)
+}
+
+
+@_cdecl("ph_photo_library_unavailability_reason_json")
+public func ph_photo_library_unavailability_reason_json(
+    _ library: UnsafeMutableRawPointer?,
+    _ outError: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
+) -> UnsafeMutablePointer<CChar>? {
+    guard let library else {
+        pkrSetMessageError(outError, message: "missing PHPhotoLibrary")
+        return nil
+    }
+    let photoLibrary = pkrBorrow(library, as: PKRPhotoLibraryBox.self).library
+    do {
+        return pkrCString(try pkrEncodeJSON(photoLibrary.unavailabilityReason.map(pkrErrorPayload)))
+    } catch {
+        pkrSetError(outError, error)
+        return nil
+    }
+}
+
+@_cdecl("ph_photo_library_register_availability_observer")
+public func ph_photo_library_register_availability_observer(
+    _ library: UnsafeMutableRawPointer?,
+    _ callback: @escaping PKRAvailabilityObserverCallback,
+    _ userInfo: UnsafeMutableRawPointer?,
+    _ outError: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
+) -> UnsafeMutableRawPointer? {
+    guard let library else {
+        pkrSetMessageError(outError, message: "missing PHPhotoLibrary")
+        return nil
+    }
+
+    let photoLibrary = pkrBorrow(library, as: PKRPhotoLibraryBox.self).library
+    let observer = PKRAvailabilityObserverBox(
+        library: photoLibrary,
+        callback: callback,
+        userInfo: userInfo
+    )
+    photoLibrary.register(observer)
+    return pkrRetain(observer)
+}
+
+@_cdecl("ph_photo_library_unregister_availability_observer")
+public func ph_photo_library_unregister_availability_observer(_ observer: UnsafeMutableRawPointer?) {
+    guard let observer else { return }
+    let box = pkrBorrow(observer, as: PKRAvailabilityObserverBox.self)
+    box.library.unregisterAvailabilityObserver(box)
+    pkrRelease(observer)
+}
+
+@_cdecl("ph_photo_library_current_change_token_json")
+public func ph_photo_library_current_change_token_json(
+    _ library: UnsafeMutableRawPointer?,
+    _ outError: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
+) -> UnsafeMutablePointer<CChar>? {
+    guard let library else {
+        pkrSetMessageError(outError, message: "missing PHPhotoLibrary")
+        return nil
+    }
+
+    do {
+        let photoLibrary = pkrBorrow(library, as: PKRPhotoLibraryBox.self).library
+        return pkrCString(try pkrEncodeJSON(try pkrEncodePersistentChangeToken(photoLibrary.currentChangeToken)))
+    } catch {
+        pkrSetError(outError, error)
+        return nil
+    }
+}
+
+@_cdecl("ph_photo_library_fetch_persistent_changes_since_token_json")
+public func ph_photo_library_fetch_persistent_changes_since_token_json(
+    _ library: UnsafeMutableRawPointer?,
+    _ tokenJSON: UnsafePointer<CChar>?,
+    _ outError: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
+) -> UnsafeMutablePointer<CChar>? {
+    guard let library else {
+        pkrSetMessageError(outError, message: "missing PHPhotoLibrary")
+        return nil
+    }
+
+    do {
+        let photoLibrary = pkrBorrow(library, as: PKRPhotoLibraryBox.self).library
+        let tokenPayload = try pkrDecodeJSON(tokenJSON, as: PKRPersistentChangeTokenPayload.self)
+        let token = try pkrDecodePersistentChangeToken(tokenPayload)
+        let result = try photoLibrary.fetchPersistentChanges(since: token)
+        var changes: [PKRPersistentChangePayload] = []
+        for change in result {
+            if let payload = try? pkrEncodePersistentChange(change) {
+                changes.append(payload)
+            }
+        }
+        return pkrCString(try pkrEncodeJSON(PKRPersistentChangeFetchResultPayload(changes: changes)))
+    } catch {
+        pkrSetError(outError, error)
+        return nil
+    }
 }

@@ -10,6 +10,8 @@ fn live_photo_result_exposes_live_photo_snapshot() {
         degraded: false,
         size_width: 320.0,
         size_height: 240.0,
+        request_id: None,
+        error: None,
     };
 
     let live_photo = result.live_photo().expect("expected live photo snapshot");

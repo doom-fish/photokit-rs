@@ -24,7 +24,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 || error.message.contains("in cloud")
                 || error.message.contains("in iCloud") =>
         {
-            println!("image request unavailable for this asset: {}", error.message);
+            println!(
+                "image request unavailable for this asset: {}",
+                error.message
+            );
             return Ok(());
         }
         Err(error) => return Err(error.into()),

@@ -27,7 +27,9 @@ pub struct PHContentEditingOutput {
 impl PHContentEditingOutput {
     pub(crate) unsafe fn from_raw(raw: *mut c_void) -> Result<Self, PhotoKitError> {
         let raw = NonNull::new(raw).ok_or_else(|| {
-            PhotoKitError::OperationFailed("failed to create PHContentEditingOutput handle".to_owned())
+            PhotoKitError::OperationFailed(
+                "failed to create PHContentEditingOutput handle".to_owned(),
+            )
         })?;
         let mut error = ptr::null_mut();
         let payload = ffi::ph_content_editing_output_json(raw.as_ptr(), &mut error);
@@ -66,7 +68,9 @@ impl PHContentEditingOutput {
         };
         if status == ffi::status::OK && error.is_null() {
             let mut refresh_error = ptr::null_mut();
-            let payload = unsafe { ffi::ph_content_editing_output_json(self.raw.as_ptr(), &mut refresh_error) };
+            let payload = unsafe {
+                ffi::ph_content_editing_output_json(self.raw.as_ptr(), &mut refresh_error)
+            };
             if payload.is_null() {
                 Err(unsafe {
                     PhotoKitError::from_error_ptr(
@@ -88,11 +92,16 @@ impl PHContentEditingOutput {
         }
     }
 
+    pub(crate) fn as_raw(&self) -> *mut c_void {
+        self.raw.as_ptr()
+    }
+
     pub fn rendered_content_url_for_type_identifier(
         &self,
         type_identifier: &str,
     ) -> Result<String, PhotoKitError> {
-        let type_identifier = cstring_from_str(type_identifier, "rendered content type identifier")?;
+        let type_identifier =
+            cstring_from_str(type_identifier, "rendered content type identifier")?;
         let mut error = ptr::null_mut();
         let payload = unsafe {
             ffi::ph_content_editing_output_rendered_content_url_for_type(
@@ -138,7 +147,8 @@ impl Drop for PHContentEditingOutput {
 impl PHContentEditingInput {
     pub fn create_content_editing_output(&self) -> Result<PHContentEditingOutput, PhotoKitError> {
         let mut error = ptr::null_mut();
-        let raw = unsafe { ffi::ph_content_editing_output_new_for_input(self.raw.as_ptr(), &mut error) };
+        let raw =
+            unsafe { ffi::ph_content_editing_output_new_for_input(self.raw.as_ptr(), &mut error) };
         if raw.is_null() {
             Err(unsafe {
                 PhotoKitError::from_error_ptr(error, "create content editing output failed")

@@ -1,3 +1,4 @@
+use std::ops::{BitOr, BitOrAssign};
 use std::ptr;
 
 use serde::{Deserialize, Serialize};
@@ -52,6 +53,116 @@ pub struct PHCoordinate {
     pub longitude: f64,
 }
 
+macro_rules! option_set_type {
+    ($name:ident, $raw:ty, { $($constant:ident = $value:expr,)* }) => {
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+        #[serde(transparent)]
+        pub struct $name(pub $raw);
+
+        impl $name {
+            $(pub const $constant: Self = Self($value);)*
+
+            pub const fn bits(self) -> $raw {
+                self.0
+            }
+
+            pub const fn contains(self, other: Self) -> bool {
+                self.0 & other.0 == other.0
+            }
+        }
+
+        impl From<$raw> for $name {
+            fn from(value: $raw) -> Self {
+                Self(value)
+            }
+        }
+
+        impl From<$name> for $raw {
+            fn from(value: $name) -> Self {
+                value.0
+            }
+        }
+
+        impl BitOr for $name {
+            type Output = Self;
+
+            fn bitor(self, rhs: Self) -> Self::Output {
+                Self(self.0 | rhs.0)
+            }
+        }
+
+        impl BitOrAssign for $name {
+            fn bitor_assign(&mut self, rhs: Self) {
+                self.0 |= rhs.0;
+            }
+        }
+    };
+}
+
+option_set_type!(PHAssetMediaSubtype, u64, {
+    NONE = 0,
+    PHOTO_PANORAMA = 1 << 0,
+    PHOTO_HDR = 1 << 1,
+    PHOTO_SCREENSHOT = 1 << 2,
+    PHOTO_LIVE = 1 << 3,
+    PHOTO_DEPTH_EFFECT = 1 << 4,
+    SPATIAL_MEDIA = 1 << 10,
+    VIDEO_STREAMED = 1 << 16,
+    VIDEO_HIGH_FRAME_RATE = 1 << 17,
+    VIDEO_TIMELAPSE = 1 << 18,
+    VIDEO_SCREEN_RECORDING = 1 << 19,
+    VIDEO_CINEMATIC = 1 << 21,
+});
+
+option_set_type!(PHAssetBurstSelectionType, u64, {
+    NONE = 0,
+    AUTO_PICK = 1 << 0,
+    USER_PICK = 1 << 1,
+});
+
+option_set_type!(PHAssetSourceType, u64, {
+    NONE = 0,
+    USER_LIBRARY = 1 << 0,
+    CLOUD_SHARED = 1 << 1,
+    ITUNES_SYNCED = 1 << 2,
+});
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct PHAssetResourceType(pub i64);
+
+impl PHAssetResourceType {
+    pub const PHOTO: Self = Self(1);
+    pub const VIDEO: Self = Self(2);
+    pub const AUDIO: Self = Self(3);
+    pub const ALTERNATE_PHOTO: Self = Self(4);
+    pub const FULL_SIZE_PHOTO: Self = Self(5);
+    pub const FULL_SIZE_VIDEO: Self = Self(6);
+    pub const ADJUSTMENT_DATA: Self = Self(7);
+    pub const ADJUSTMENT_BASE_PHOTO: Self = Self(8);
+    pub const PAIRED_VIDEO: Self = Self(9);
+    pub const FULL_SIZE_PAIRED_VIDEO: Self = Self(10);
+    pub const ADJUSTMENT_BASE_PAIRED_VIDEO: Self = Self(11);
+    pub const ADJUSTMENT_BASE_VIDEO: Self = Self(12);
+    pub const PHOTO_PROXY: Self = Self(19);
+
+    pub const fn raw_value(self) -> i64 {
+        self.0
+    }
+}
+
+impl From<i64> for PHAssetResourceType {
+    fn from(value: i64) -> Self {
+        Self(value)
+    }
+}
+
+impl From<PHAssetResourceType> for i64 {
+    fn from(value: PHAssetResourceType) -> Self {
+        value.0
+    }
+}
+
 #[allow(clippy::unsafe_derive_deserialize)]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -65,7 +176,7 @@ pub struct PHAsset {
     pub pixel_height: u64,
     pub location: Option<PHCoordinate>,
     pub media_type: PHMediaType,
-    pub media_subtypes: u64,
+    pub media_subtypes: PHAssetMediaSubtype,
     pub duration: f64,
     #[serde(default)]
     pub is_hidden: bool,
@@ -77,11 +188,11 @@ pub struct PHAsset {
     #[serde(default)]
     pub burst_identifier: Option<String>,
     #[serde(default)]
-    pub burst_selection_types: u64,
+    pub burst_selection_types: PHAssetBurstSelectionType,
     #[serde(default)]
     pub represents_burst: bool,
     #[serde(default)]
-    pub source_type: u64,
+    pub source_type: PHAssetSourceType,
     #[serde(default)]
     pub has_adjustments: bool,
     #[serde(default)]
@@ -90,7 +201,8 @@ pub struct PHAsset {
 
 impl PHAsset {
     pub fn is_live_photo(&self) -> bool {
-        self.media_subtypes & (1 << 3) != 0
+        self.media_subtypes
+            .contains(PHAssetMediaSubtype::PHOTO_LIVE)
     }
 
     pub fn fetch(fetch_options: &PHFetchOptions) -> Result<PHFetchResult<Self>, PhotoKitError> {
@@ -255,7 +367,7 @@ impl PHAsset {
 #[serde(rename_all = "camelCase")]
 pub struct PHAssetResource {
     pub asset_local_identifier: String,
-    pub resource_type: i64,
+    pub resource_type: PHAssetResourceType,
     pub original_filename: String,
     pub uniform_type_identifier: Option<String>,
     #[serde(default)]

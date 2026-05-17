@@ -2,10 +2,13 @@ use std::ptr::{self, NonNull};
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::PhotoKitError;
+use crate::error::{NSErrorInfo, PhotoKitError};
 use crate::ffi;
 use crate::image_manager::{PHImageRequest, PHLivePhotoRequestHandle};
 use crate::private::json_cstring;
+
+#[allow(non_upper_case_globals)]
+pub const PHLivePhotoInfoErrorKey: &str = "PHLivePhotoInfoErrorKey";
 
 #[derive(Debug, Clone, PartialEq, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -25,6 +28,10 @@ pub struct PHLivePhotoResult {
     pub size_width: f64,
     #[serde(default)]
     pub size_height: f64,
+    #[serde(default)]
+    pub request_id: Option<i32>,
+    #[serde(default)]
+    pub error: Option<NSErrorInfo>,
 }
 
 impl PHLivePhotoResult {

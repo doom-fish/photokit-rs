@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.1 - 2026-05-17
+
+- Closed the remaining symbol-level Photos.framework audit gaps and reached 100% audited coverage on macOS.
+- Added typed wrappers for Photos enums/constants/errors including asset/media/resource/source subtypes, `PHPhotosError`, and request-info keys.
+- Added safe wrappers for `PHAssetResourceManager`, `PHCollection`, `PHChangeRequest`, `PHAssetChangeRequest`, `PHAssetCollectionChangeRequest`, `PHCollectionListChangeRequest`, `PHProject`, and `PHProjectChangeRequest`.
+- Added persistent change history, availability observer support, video request APIs, and `PHLivePhotoEditingContext` frame-processing/playback helpers.
+- Added exhaustive smoke tests for the new surfaces and refreshed the coverage/release documentation for v0.2.1.
+
 ## 0.2.0 - 2026-05-16
 
 - Split the Swift bridge into per-area files and reorganized the Rust API into area modules.

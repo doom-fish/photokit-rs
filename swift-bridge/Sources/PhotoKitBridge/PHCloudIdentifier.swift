@@ -31,7 +31,7 @@ func pkrEncodeCloudIdentifier(_ identifier: PHCloudIdentifier?) -> PKRCloudIdent
 }
 
 func pkrNotFoundErrorPayload(_ message: String) -> PKRErrorPayload {
-    PKRErrorPayload(domain: "photokit-rs", code: -1, message: message)
+    PKRErrorPayload(domain: "photokit-rs", code: -1, message: message, localIdentifiers: [])
 }
 
 @_cdecl("ph_photo_library_cloud_identifier_mappings_json")

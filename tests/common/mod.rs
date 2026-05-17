@@ -47,6 +47,16 @@ pub fn first_collection_list() -> Option<PHCollectionList> {
     })
 }
 
+pub fn first_video_asset() -> Option<PHAsset> {
+    authorized_library().and_then(|_| {
+        PHAsset::fetch_with_media_type(
+            PHMediaType::Video,
+            &PHFetchOptions::default().with_fetch_limit(1),
+        )
+        .ok()
+        .and_then(|assets| assets.into_vec().into_iter().next())
+    })
+}
 pub fn first_live_photo_asset() -> Option<PHAsset> {
     authorized_library().and_then(|_| {
         PHAsset::fetch(&PHFetchOptions::default())

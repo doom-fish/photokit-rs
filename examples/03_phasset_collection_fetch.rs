@@ -11,7 +11,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("collections: {}", collections.len());
     if let Some(collection) = collections.first() {
         println!("first collection: {:?}", collection.localized_title);
-        println!("assets in first collection: {}", collection.assets(&PHFetchOptions::default())?.len());
+        println!(
+            "assets in first collection: {}",
+            collection.assets(&PHFetchOptions::default())?.len()
+        );
     }
     Ok(())
 }

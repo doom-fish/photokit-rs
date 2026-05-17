@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::asset::PHAssetSourceType;
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PHSortDescriptor {
     pub key: String,
@@ -29,7 +31,7 @@ pub struct PHFetchOptions {
     pub include_hidden_assets: bool,
     #[serde(default)]
     pub include_all_burst_assets: bool,
-    pub include_asset_source_types: Option<u64>,
+    pub include_asset_source_types: Option<PHAssetSourceType>,
     pub fetch_limit: Option<usize>,
     #[serde(default = "default_true")]
     pub wants_incremental_change_details: bool,
@@ -75,8 +77,11 @@ impl PHFetchOptions {
         self
     }
 
-    pub fn with_include_asset_source_types(mut self, include_asset_source_types: u64) -> Self {
-        self.include_asset_source_types = Some(include_asset_source_types);
+    pub fn with_include_asset_source_types(
+        mut self,
+        include_asset_source_types: impl Into<PHAssetSourceType>,
+    ) -> Self {
+        self.include_asset_source_types = Some(include_asset_source_types.into());
         self
     }
 

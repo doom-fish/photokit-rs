@@ -23,7 +23,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 || error.message.contains("cancelled")
                 || error.message.contains("in iCloud") =>
         {
-            println!("content editing output unavailable for this asset: {}", error.message);
+            println!(
+                "content editing output unavailable for this asset: {}",
+                error.message
+            );
             return Ok(());
         }
         Err(PhotoKitError::OperationFailed(message))

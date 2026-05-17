@@ -80,7 +80,9 @@ pub struct PHContentEditingInput {
 impl PHContentEditingInput {
     pub(crate) unsafe fn from_raw(raw: *mut c_void) -> Result<Self, PhotoKitError> {
         let raw = NonNull::new(raw).ok_or_else(|| {
-            PhotoKitError::OperationFailed("failed to create PHContentEditingInput handle".to_owned())
+            PhotoKitError::OperationFailed(
+                "failed to create PHContentEditingInput handle".to_owned(),
+            )
         })?;
         let mut error = ptr::null_mut();
         let payload = ffi::ph_content_editing_input_json(raw.as_ptr(), &mut error);

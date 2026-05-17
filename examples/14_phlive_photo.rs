@@ -8,7 +8,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .map(ToOwned::to_owned)
             .collect::<Vec<_>>();
         if !files.is_empty() {
-            let mut request_options = PHImageRequest::new(320.0, 240.0, PHImageContentMode::AspectFit);
+            let mut request_options =
+                PHImageRequest::new(320.0, 240.0, PHImageContentMode::AspectFit);
             request_options.network_access_allowed = true;
             let request = PHLivePhoto::request_with_resource_file_urls(&files, &request_options)?;
             let result = request.wait(10_000)?;
@@ -40,7 +41,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 || error.message.contains("in cloud")
                 || error.message.contains("in iCloud") =>
         {
-            println!("live photo request unavailable for this asset: {}", error.message);
+            println!(
+                "live photo request unavailable for this asset: {}",
+                error.message
+            );
             return Ok(());
         }
         Err(error) => return Err(error.into()),

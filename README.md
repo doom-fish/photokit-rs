@@ -2,7 +2,7 @@
 
 Safe Rust bindings for Apple's [Photos](https://developer.apple.com/documentation/photos) framework on macOS.
 
-> **Status:** v0.2.0 covers `PHAsset`, `PHAssetCollection`, `PHCollectionList`, `PHPhotoLibrary`, `PHImageManager`, `PHFetchResult`, `PHChange`, `PHContentEditingInput`, `PHContentEditingOutput`, `PHObjectChangeDetails`, `PHFetchOptions`, `PHAssetCreationRequest`, `PHLivePhoto`, and `PHCloudIdentifier` through a multi-file Swift bridge.
+> **Status:** v0.2.1 closes the symbol-level Photos.framework audit at 100% coverage, adding `PHAssetResourceManager`, generic `PHCollection`/`PHChangeRequest` mutation APIs, persistent change history, `PHLivePhotoEditingContext`, video requests, project wrappers, and typed Photos constants/errors.
 
 ## Quick start
 
@@ -33,13 +33,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## Highlights
 
-- `PHPhotoLibrary` authorization helpers plus summary/detailed change observers.
-- `PHAsset`, `PHAssetCollection`, and `PHCollectionList` fetch helpers with editable capability checks.
-- `PHFetchOptions` and `PHFetchResult<T>` convenience wrappers for filtering and iteration.
-- `PHImageManager` / `PHCachingImageManager` request handles for images, image data, live photos, and caching.
-- `PHContentEditingInput` / `PHContentEditingOutput` handles for non-destructive editing workflows.
-- `PHAssetCreationRequest` builder-style asset creation helpers.
-- `PHCloudIdentifier` batch lookup helpers for local/cloud identifier mapping.
+- `PHPhotoLibrary` authorization helpers plus summary/detailed change observers, availability observers, and persistent-change history helpers.
+- `PHAsset`, `PHCollection`, `PHAssetCollection`, and `PHCollectionList` fetch helpers with typed subtype/source/resource wrappers.
+- `PHChangeRequest` builders for asset, album, folder, and project mutation flows.
+- `PHImageManager` / `PHCachingImageManager` request handles for images, image data, live photos, video requests, and caching.
+- `PHAssetResourceManager` transfer helpers for reading or writing asset resources.
+- `PHContentEditingInput` / `PHContentEditingOutput` plus `PHLivePhotoEditingContext` for non-destructive editing workflows.
+- `PHCloudIdentifier` batch lookup helpers and richer Photos-specific error metadata.
 
 ## Coverage audit
 

@@ -22,6 +22,28 @@ extern "C" {
         request_json: *const c_char,
         out_error: *mut *mut c_char,
     ) -> *mut c_void;
+    pub fn ph_image_manager_request_player_item_for_video_json(
+        manager: *mut c_void,
+        asset_identifier: *const c_char,
+        options_json: *const c_char,
+        timeout_ms: u64,
+        out_error: *mut *mut c_char,
+    ) -> *mut c_char;
+    pub fn ph_image_manager_request_export_session_for_video_json(
+        manager: *mut c_void,
+        asset_identifier: *const c_char,
+        options_json: *const c_char,
+        export_preset: *const c_char,
+        timeout_ms: u64,
+        out_error: *mut *mut c_char,
+    ) -> *mut c_char;
+    pub fn ph_image_manager_request_av_asset_for_video_json(
+        manager: *mut c_void,
+        asset_identifier: *const c_char,
+        options_json: *const c_char,
+        timeout_ms: u64,
+        out_error: *mut *mut c_char,
+    ) -> *mut c_char;
     pub fn ph_image_request_wait_json(
         request: *mut c_void,
         timeout_ms: u64,

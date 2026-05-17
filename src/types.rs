@@ -1,24 +1,63 @@
 pub use crate::asset::{
-    PHAsset, PHAssetEditOperation, PHAssetPlaybackStyle, PHAssetResource, PHCoordinate,
+    PHAsset, PHAssetBurstSelectionType, PHAssetEditOperation, PHAssetMediaSubtype,
+    PHAssetPlaybackStyle, PHAssetResource, PHAssetResourceType, PHAssetSourceType, PHCoordinate,
     PHMediaType,
 };
-pub use crate::asset_collection::{PHAssetCollection, PHAssetCollectionType, PHCollectionEditOperation};
+pub use crate::asset_change_request::PHAssetChangeRequest;
+pub use crate::asset_collection::{
+    PHAssetCollection, PHAssetCollectionSubtype, PHAssetCollectionType, PHCollectionEditOperation,
+};
+pub use crate::asset_collection_change_request::{
+    PHAssetCollectionAssetMutation, PHAssetCollectionChangeRequest,
+};
 pub use crate::asset_creation_request::{
     PHAssetCreationRequest, PHAssetCreationResource, PHAssetResourceCreationOptions,
 };
-pub use crate::cloud_identifier::{PHCloudIdentifier, PHCloudIdentifierMapping, PHLocalIdentifierMapping};
-pub use crate::collection_list::{PHCollectionList, PHCollectionListType};
+pub use crate::asset_resource_manager::{
+    PHAssetResourceDataResult, PHAssetResourceManager, PHAssetResourceRequestOptions,
+    PHAssetResourceWriteResult,
+};
+pub use crate::change::PHChange;
+pub use crate::change_request::PHChangeRequest;
+pub use crate::cloud_identifier::{
+    PHCloudIdentifier, PHCloudIdentifierMapping, PHLocalIdentifierMapping,
+};
+pub use crate::collection::PHCollection;
+pub use crate::collection_list::{PHCollectionList, PHCollectionListSubtype, PHCollectionListType};
+pub use crate::collection_list_change_request::{
+    PHCollectionListChangeRequest, PHCollectionListChildMutation,
+};
 pub use crate::content_editing_input::{
     PHAdjustmentData, PHContentEditingInput, PHContentEditingInputInfo,
     PHContentEditingInputRequestOptions,
 };
 pub use crate::content_editing_output::{PHContentEditingOutput, PHContentEditingOutputInfo};
+pub use crate::error::{
+    NSErrorInfo, PHAuthorizationStatus, PHLocalIdentifiersErrorKey, PHPhotosError,
+    PHPhotosErrorDomain, PhotoKitError,
+};
 pub use crate::fetch_options::{PHFetchOptions, PHSortDescriptor};
 pub use crate::fetch_result::PHFetchResult;
+pub use crate::fetch_result_change_details::{PHFetchResultChangeDetails, PHFetchResultMove};
 pub use crate::image_manager::{
-    PHImageContentMode, PHImageDataResult, PHImageRequest, PHImageRequestOptionsDeliveryMode,
-    PHImageRequestOptionsResizeMode, PHImageRequestOptionsVersion, PHImageResult,
+    PHImageContentMode, PHImageDataResult, PHImageErrorKey, PHImageManagerMaximumSize,
+    PHImageRequest, PHImageRequestOptionsDeliveryMode, PHImageRequestOptionsResizeMode,
+    PHImageRequestOptionsVersion, PHImageResult, PHImageResultRequestIDKey, PHImageSize,
+    PHVideoRequestOptions, PHVideoRequestOptionsDeliveryMode, PHVideoRequestOptionsVersion,
+    PHVideoResult,
 };
-pub use crate::live_photo::{PHLivePhoto, PHLivePhotoResult};
+pub use crate::live_photo::{PHLivePhoto, PHLivePhotoInfoErrorKey, PHLivePhotoResult};
+pub use crate::live_photo_editing_context::{
+    PHLivePhotoEditingContext, PHLivePhotoEditingContextInfo, PHLivePhotoEditingSaveResult,
+    PHLivePhotoFrame, PHLivePhotoFrameProcessingDecision, PHLivePhotoFrameType,
+};
+pub use crate::object::{PHObject, PHObjectPlaceholder};
 pub use crate::object_change_details::PHObjectChangeDetails;
-pub use crate::photo_library::{PHAccessLevel, PHPhotoLibraryChange};
+pub use crate::persistent_change::{
+    PHObjectType, PHPersistentChange, PHPersistentChangeFetchResult, PHPersistentChangeToken,
+    PHPersistentObjectChangeDetails,
+};
+pub use crate::photo_library::{
+    PHAccessLevel, PHPhotoLibraryAvailabilityChange, PHPhotoLibraryChange,
+};
+pub use crate::project::{PHProject, PHProjectChangeRequest};

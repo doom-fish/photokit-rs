@@ -2,7 +2,8 @@ use photokit::prelude::*;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let status = PHPhotoLibrary::authorization_status();
-    let scoped_status = PHPhotoLibrary::authorization_status_for_access_level(PHAccessLevel::ReadWrite);
+    let scoped_status =
+        PHPhotoLibrary::authorization_status_for_access_level(PHAccessLevel::ReadWrite);
     println!("authorization: {status:?} / {scoped_status:?}");
 
     if scoped_status.is_authorized() {

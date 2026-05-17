@@ -38,6 +38,7 @@ public struct PKRErrorPayload: Codable {
     public var domain: String
     public var code: Int
     public var message: String
+    public var localIdentifiers: [String]
 }
 
 private let pkrFractionalDateFormatter: ISO8601DateFormatter = {
@@ -79,10 +80,20 @@ public func pkrDecodeJSON<T: Decodable>(_ json: UnsafePointer<CChar>?, as type: 
 
 public func pkrErrorPayload(from error: Error) -> PKRErrorPayload {
     let nsError = error as NSError
+    let localIdentifiers: [String] = {
+        if #available(macOS 12.0, *), let identifiers = nsError.userInfo[PHLocalIdentifiersErrorKey] as? [String] {
+            return identifiers
+        }
+        if #available(macOS 12.0, *), let identifiers = nsError.userInfo[PHLocalIdentifiersErrorKey] as? NSSet {
+            return identifiers.compactMap { $0 as? String }
+        }
+        return []
+    }()
     return PKRErrorPayload(
         domain: nsError.domain,
         code: nsError.code,
-        message: nsError.localizedDescription
+        message: nsError.localizedDescription,
+        localIdentifiers: localIdentifiers
     )
 }
 
@@ -106,7 +117,7 @@ public func pkrSetMessageError(
     code: Int = -1
 ) {
     guard let outError else { return }
-    let payload = PKRErrorPayload(domain: domain, code: code, message: message)
+    let payload = PKRErrorPayload(domain: domain, code: code, message: message, localIdentifiers: [])
     if let json = try? pkrEncodeJSON(payload) {
         outError.pointee = pkrCString(json)
     } else {

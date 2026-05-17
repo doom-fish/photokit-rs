@@ -58,7 +58,9 @@ impl<T: PartialEq> PHFetchResult<T> {
     }
 
     pub fn index_of(&self, object: &T) -> Option<usize> {
-        self.objects.iter().position(|candidate| candidate == object)
+        self.objects
+            .iter()
+            .position(|candidate| candidate == object)
     }
 }
 

@@ -16,7 +16,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     };
 
-    let mappings = library.cloud_identifier_mappings_for_local_identifiers(std::slice::from_ref(&asset.local_identifier))?;
+    let mappings = library.cloud_identifier_mappings_for_local_identifiers(
+        std::slice::from_ref(&asset.local_identifier),
+    )?;
     println!("mapping entries: {}", mappings.len());
     Ok(())
 }

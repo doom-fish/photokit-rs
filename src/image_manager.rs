@@ -5,10 +5,27 @@ use base64::Engine;
 use serde::{Deserialize, Serialize};
 
 use crate::asset::PHAsset;
-use crate::error::PhotoKitError;
+use crate::error::{NSErrorInfo, PhotoKitError};
 use crate::ffi;
 use crate::live_photo::PHLivePhotoResult;
 use crate::private::{cstring_from_str, json_cstring, parse_json_ptr};
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PHImageSize {
+    pub width: f64,
+    pub height: f64,
+}
+
+#[allow(non_upper_case_globals)]
+pub const PHImageManagerMaximumSize: PHImageSize = PHImageSize {
+    width: -1.0,
+    height: -1.0,
+};
+#[allow(non_upper_case_globals)]
+pub const PHImageResultRequestIDKey: &str = "PHImageResultRequestIDKey";
+#[allow(non_upper_case_globals)]
+pub const PHImageErrorKey: &str = "PHImageErrorKey";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -43,6 +60,49 @@ pub enum PHImageRequestOptionsResizeMode {
     Exact,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct PHVideoRequestOptionsVersion(pub i64);
+
+impl PHVideoRequestOptionsVersion {
+    pub const CURRENT: Self = Self(0);
+    pub const ORIGINAL: Self = Self(1);
+}
+
+impl Default for PHVideoRequestOptionsVersion {
+    fn default() -> Self {
+        Self::CURRENT
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct PHVideoRequestOptionsDeliveryMode(pub i64);
+
+impl PHVideoRequestOptionsDeliveryMode {
+    pub const AUTOMATIC: Self = Self(0);
+    pub const HIGH_QUALITY_FORMAT: Self = Self(1);
+    pub const MEDIUM_QUALITY_FORMAT: Self = Self(2);
+    pub const FAST_FORMAT: Self = Self(3);
+}
+
+impl Default for PHVideoRequestOptionsDeliveryMode {
+    fn default() -> Self {
+        Self::AUTOMATIC
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct PHVideoRequestOptions {
+    #[serde(default)]
+    pub network_access_allowed: bool,
+    #[serde(default)]
+    pub version: PHVideoRequestOptionsVersion,
+    #[serde(default)]
+    pub delivery_mode: PHVideoRequestOptionsDeliveryMode,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PHImageRequest {
@@ -74,6 +134,14 @@ impl PHImageRequest {
             allow_secondary_degraded_image: false,
         }
     }
+
+    pub fn maximum(content_mode: PHImageContentMode) -> Self {
+        Self::new(
+            PHImageManagerMaximumSize.width,
+            PHImageManagerMaximumSize.height,
+            content_mode,
+        )
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -84,6 +152,10 @@ pub struct PHImageResult {
     pub height: f64,
     pub cancelled: bool,
     pub degraded: bool,
+    #[serde(default)]
+    pub request_id: Option<i32>,
+    #[serde(default)]
+    pub error: Option<NSErrorInfo>,
 }
 
 impl PHImageResult {
@@ -107,6 +179,10 @@ pub struct PHImageDataResult {
     pub degraded: bool,
     #[serde(default)]
     pub is_in_cloud: bool,
+    #[serde(default)]
+    pub request_id: Option<i32>,
+    #[serde(default)]
+    pub error: Option<NSErrorInfo>,
 }
 
 impl PHImageDataResult {
@@ -115,6 +191,36 @@ impl PHImageDataResult {
             .decode(self.data_base64.as_bytes())
             .unwrap_or_default()
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PHVideoResult {
+    pub result_type: String,
+    #[serde(default)]
+    pub request_id: Option<i32>,
+    #[serde(default)]
+    pub cancelled: bool,
+    #[serde(default)]
+    pub is_in_cloud: bool,
+    #[serde(default)]
+    pub error: Option<NSErrorInfo>,
+    #[serde(default)]
+    pub asset_url: Option<String>,
+    #[serde(default)]
+    pub duration_seconds: Option<f64>,
+    #[serde(default)]
+    pub has_player_item: bool,
+    #[serde(default)]
+    pub has_export_session: bool,
+    #[serde(default)]
+    pub has_av_asset: bool,
+    #[serde(default)]
+    pub has_audio_mix: bool,
+    #[serde(default)]
+    pub export_preset: Option<String>,
+    #[serde(default)]
+    pub supported_file_types: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -196,6 +302,100 @@ impl PHImageManager {
                 PhotoKitError::from_error_ptr(error, "requestLivePhoto failed")
             })
     }
+
+    pub fn request_player_item_for_video(
+        &self,
+        asset: &PHAsset,
+        options: &PHVideoRequestOptions,
+        timeout_ms: u64,
+    ) -> Result<PHVideoResult, PhotoKitError> {
+        self.request_video_json(
+            asset,
+            options,
+            timeout_ms,
+            None,
+            ffi::ph_image_manager_request_player_item_for_video_json,
+        )
+    }
+
+    pub fn request_export_session_for_video(
+        &self,
+        asset: &PHAsset,
+        options: &PHVideoRequestOptions,
+        export_preset: &str,
+        timeout_ms: u64,
+    ) -> Result<PHVideoResult, PhotoKitError> {
+        let export_preset = cstring_from_str(export_preset, "video export preset")?;
+        let asset_identifier = cstring_from_str(&asset.local_identifier, "asset local identifier")?;
+        let options_json = json_cstring(options, "PHVideoRequestOptions")?;
+        let mut error = ptr::null_mut();
+        let payload = unsafe {
+            ffi::ph_image_manager_request_export_session_for_video_json(
+                self.raw.as_ptr(),
+                asset_identifier.as_ptr(),
+                options_json.as_ptr(),
+                export_preset.as_ptr(),
+                timeout_ms,
+                &mut error,
+            )
+        };
+        if payload.is_null() {
+            Err(unsafe {
+                PhotoKitError::from_error_ptr(error, "requestExportSessionForVideo failed")
+            })
+        } else {
+            unsafe { parse_json_ptr(payload, "PHVideoResult") }
+        }
+    }
+
+    pub fn request_av_asset_for_video(
+        &self,
+        asset: &PHAsset,
+        options: &PHVideoRequestOptions,
+        timeout_ms: u64,
+    ) -> Result<PHVideoResult, PhotoKitError> {
+        self.request_video_json(
+            asset,
+            options,
+            timeout_ms,
+            None,
+            ffi::ph_image_manager_request_av_asset_for_video_json,
+        )
+    }
+
+    fn request_video_json(
+        &self,
+        asset: &PHAsset,
+        options: &PHVideoRequestOptions,
+        timeout_ms: u64,
+        export_preset: Option<&str>,
+        request_fn: unsafe extern "C" fn(
+            *mut c_void,
+            *const core::ffi::c_char,
+            *const core::ffi::c_char,
+            u64,
+            *mut *mut core::ffi::c_char,
+        ) -> *mut core::ffi::c_char,
+    ) -> Result<PHVideoResult, PhotoKitError> {
+        debug_assert!(export_preset.is_none());
+        let asset_identifier = cstring_from_str(&asset.local_identifier, "asset local identifier")?;
+        let options_json = json_cstring(options, "PHVideoRequestOptions")?;
+        let mut error = ptr::null_mut();
+        let payload = unsafe {
+            request_fn(
+                self.raw.as_ptr(),
+                asset_identifier.as_ptr(),
+                options_json.as_ptr(),
+                timeout_ms,
+                &mut error,
+            )
+        };
+        if payload.is_null() {
+            Err(unsafe { PhotoKitError::from_error_ptr(error, "video request failed") })
+        } else {
+            unsafe { parse_json_ptr(payload, "PHVideoResult") }
+        }
+    }
 }
 
 impl Drop for PHImageManager {
@@ -211,9 +411,10 @@ pub struct PHCachingImageManager {
 
 impl PHCachingImageManager {
     pub fn new() -> Result<Self, PhotoKitError> {
-        let raw = NonNull::new(unsafe { ffi::ph_caching_image_manager_new() }).ok_or_else(|| {
-            PhotoKitError::OperationFailed("failed to create PHCachingImageManager".to_owned())
-        })?;
+        let raw =
+            NonNull::new(unsafe { ffi::ph_caching_image_manager_new() }).ok_or_else(|| {
+                PhotoKitError::OperationFailed("failed to create PHCachingImageManager".to_owned())
+            })?;
         Ok(Self { raw })
     }
 

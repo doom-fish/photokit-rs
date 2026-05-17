@@ -42,6 +42,58 @@ impl PHCollectionEditOperation {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(transparent)]
+pub struct PHAssetCollectionSubtype(pub i64);
+
+impl PHAssetCollectionSubtype {
+    pub const ALBUM_REGULAR: Self = Self(2);
+    pub const ALBUM_SYNCED_EVENT: Self = Self(3);
+    pub const ALBUM_SYNCED_FACES: Self = Self(4);
+    pub const ALBUM_SYNCED_ALBUM: Self = Self(5);
+    pub const ALBUM_IMPORTED: Self = Self(6);
+    pub const ALBUM_MY_PHOTO_STREAM: Self = Self(100);
+    pub const ALBUM_CLOUD_SHARED: Self = Self(101);
+    pub const SMART_ALBUM_GENERIC: Self = Self(200);
+    pub const SMART_ALBUM_PANORAMAS: Self = Self(201);
+    pub const SMART_ALBUM_VIDEOS: Self = Self(202);
+    pub const SMART_ALBUM_FAVORITES: Self = Self(203);
+    pub const SMART_ALBUM_TIMELAPSES: Self = Self(204);
+    pub const SMART_ALBUM_ALL_HIDDEN: Self = Self(205);
+    pub const SMART_ALBUM_RECENTLY_ADDED: Self = Self(206);
+    pub const SMART_ALBUM_BURSTS: Self = Self(207);
+    pub const SMART_ALBUM_SLOMO_VIDEOS: Self = Self(208);
+    pub const SMART_ALBUM_USER_LIBRARY: Self = Self(209);
+    pub const SMART_ALBUM_SELF_PORTRAITS: Self = Self(210);
+    pub const SMART_ALBUM_SCREENSHOTS: Self = Self(211);
+    pub const SMART_ALBUM_DEPTH_EFFECT: Self = Self(212);
+    pub const SMART_ALBUM_LIVE_PHOTOS: Self = Self(213);
+    pub const SMART_ALBUM_ANIMATED: Self = Self(214);
+    pub const SMART_ALBUM_LONG_EXPOSURES: Self = Self(215);
+    pub const SMART_ALBUM_UNABLE_TO_UPLOAD: Self = Self(216);
+    pub const SMART_ALBUM_RAW: Self = Self(217);
+    pub const SMART_ALBUM_CINEMATIC: Self = Self(218);
+    pub const SMART_ALBUM_SPATIAL: Self = Self(219);
+    pub const SMART_ALBUM_SCREEN_RECORDINGS: Self = Self(220);
+    pub const ANY: Self = Self(i64::MAX);
+
+    pub const fn raw_value(self) -> i64 {
+        self.0
+    }
+}
+
+impl From<i64> for PHAssetCollectionSubtype {
+    fn from(value: i64) -> Self {
+        Self(value)
+    }
+}
+
+impl From<PHAssetCollectionSubtype> for i64 {
+    fn from(value: PHAssetCollectionSubtype) -> Self {
+        value.0
+    }
+}
+
 #[allow(clippy::unsafe_derive_deserialize)]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -49,7 +101,7 @@ pub struct PHAssetCollection {
     pub local_identifier: String,
     pub localized_title: Option<String>,
     pub collection_type: PHAssetCollectionType,
-    pub collection_subtype: i64,
+    pub collection_subtype: PHAssetCollectionSubtype,
     pub estimated_asset_count: Option<u64>,
     #[serde(default)]
     pub start_date: Option<String>,
@@ -74,17 +126,19 @@ impl PHAssetCollection {
         if payload.is_null() {
             Err(unsafe { PhotoKitError::from_error_ptr(error, "fetch asset collections failed") })
         } else {
-            let collections: Vec<Self> = unsafe { parse_json_ptr(payload, "PHAssetCollection list") }?;
+            let collections: Vec<Self> =
+                unsafe { parse_json_ptr(payload, "PHAssetCollection list") }?;
             Ok(collections.into())
         }
     }
 
     pub fn fetch_with_type(
         collection_type: PHAssetCollectionType,
-        collection_subtype: i64,
+        collection_subtype: impl Into<PHAssetCollectionSubtype>,
         fetch_options: &PHFetchOptions,
     ) -> Result<PHFetchResult<Self>, PhotoKitError> {
         let options_json = json_cstring(fetch_options, "PHFetchOptions")?;
+        let collection_subtype = collection_subtype.into();
         let mut error = ptr::null_mut();
         let payload = unsafe {
             ffi::ph_asset_collection_fetch_with_type_json(
@@ -92,7 +146,7 @@ impl PHAssetCollection {
                     PHAssetCollectionType::Album => 1,
                     PHAssetCollectionType::SmartAlbum => 2,
                 },
-                collection_subtype,
+                collection_subtype.raw_value(),
                 options_json.as_ptr(),
                 &mut error,
             )
@@ -102,7 +156,8 @@ impl PHAssetCollection {
                 PhotoKitError::from_error_ptr(error, "fetch asset collections by type failed")
             })
         } else {
-            let collections: Vec<Self> = unsafe { parse_json_ptr(payload, "PHAssetCollection list") }?;
+            let collections: Vec<Self> =
+                unsafe { parse_json_ptr(payload, "PHAssetCollection list") }?;
             Ok(collections.into())
         }
     }
@@ -129,7 +184,8 @@ impl PHAssetCollection {
                 )
             })
         } else {
-            let collections: Vec<Self> = unsafe { parse_json_ptr(payload, "PHAssetCollection list") }?;
+            let collections: Vec<Self> =
+                unsafe { parse_json_ptr(payload, "PHAssetCollection list") }?;
             Ok(collections.into())
         }
     }
@@ -161,7 +217,8 @@ impl PHAssetCollection {
                 )
             })
         } else {
-            let collections: Vec<Self> = unsafe { parse_json_ptr(payload, "PHAssetCollection list") }?;
+            let collections: Vec<Self> =
+                unsafe { parse_json_ptr(payload, "PHAssetCollection list") }?;
             Ok(collections.into())
         }
     }
@@ -194,7 +251,10 @@ impl PHAssetCollection {
             Ok(allowed != 0)
         } else {
             Err(unsafe {
-                PhotoKitError::from_error_ptr(error, "asset collection edit capability lookup failed")
+                PhotoKitError::from_error_ptr(
+                    error,
+                    "asset collection edit capability lookup failed",
+                )
             })
         }
     }

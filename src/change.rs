@@ -58,10 +58,7 @@ impl PHChange {
         };
         if payload.is_null() {
             Err(unsafe {
-                PhotoKitError::from_error_ptr(
-                    error,
-                    "asset collection change detail lookup failed",
-                )
+                PhotoKitError::from_error_ptr(error, "asset collection change detail lookup failed")
             })
         } else {
             unsafe { parse_json_ptr(payload, "PHObjectChangeDetails<PHAssetCollection>") }
@@ -86,10 +83,7 @@ impl PHChange {
         };
         if payload.is_null() {
             Err(unsafe {
-                PhotoKitError::from_error_ptr(
-                    error,
-                    "collection list change detail lookup failed",
-                )
+                PhotoKitError::from_error_ptr(error, "collection list change detail lookup failed")
             })
         } else {
             unsafe { parse_json_ptr(payload, "PHObjectChangeDetails<PHCollectionList>") }
