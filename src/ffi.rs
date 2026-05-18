@@ -2,12 +2,13 @@
 
 use core::ffi::{c_char, c_void};
 
+pub use doom_fish_utils::ffi_callbacks::JsonCallback;
+
 extern "C" {
     pub fn ph_string_free(string: *mut c_char);
 }
 
 pub type ChangeObserverCallback = unsafe extern "C" fn(change: *mut c_void, user_info: *mut c_void);
-pub type JsonCallback = unsafe extern "C" fn(payload_json: *mut c_char, user_info: *mut c_void);
 pub type LivePhotoFrameProcessorCallback =
     unsafe extern "C" fn(frame_json: *const c_char, user_info: *mut c_void) -> i32;
 

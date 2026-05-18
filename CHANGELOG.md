@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.3 - 2026-05-18
+
+- Re-exported `JsonCallback` from `doom-fish-utils::ffi_callbacks` and removed the duplicate local FFI typedef.
+
 ## 0.3.2 - 2026-06-10
 
 - **Async/unsafe audit (quality pass)**
