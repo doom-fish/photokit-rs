@@ -11,14 +11,20 @@ use crate::private::{cstring_from_str, json_cstring, parse_json_ptr, take_string
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+/// Serialized snapshot of `PHContentEditingOutput` properties.
 pub struct PHContentEditingOutputInfo {
+    /// Corresponds to `PHContentEditingOutputInfo.adjustmentData`.
     pub adjustment_data: Option<PHAdjustmentData>,
+    /// Corresponds to `PHContentEditingOutputInfo.renderedContentUrl`.
     pub rendered_content_url: String,
+    /// Corresponds to `PHContentEditingOutputInfo.defaultRenderedContentTypeIdentifier`.
     pub default_rendered_content_type_identifier: Option<String>,
     #[serde(default)]
+    /// Corresponds to `PHContentEditingOutputInfo.supportedRenderedContentTypeIdentifiers`.
     pub supported_rendered_content_type_identifiers: Vec<String>,
 }
 
+/// Wraps `PHContentEditingOutput`.
 pub struct PHContentEditingOutput {
     raw: NonNull<c_void>,
     info: PHContentEditingOutputInfo,
@@ -44,10 +50,12 @@ impl PHContentEditingOutput {
         }
     }
 
+    /// Returns the cached Photos framework snapshot for `PHContentEditingOutput`.
     pub fn snapshot(&self) -> &PHContentEditingOutputInfo {
         &self.info
     }
 
+    /// Updates the wrapped Photos framework value on `PHContentEditingOutput`.
     pub fn set_adjustment_data(
         &mut self,
         adjustment_data: Option<PHAdjustmentData>,
@@ -96,6 +104,7 @@ impl PHContentEditingOutput {
         self.raw.as_ptr()
     }
 
+    /// Wraps a Photos framework operation on `PHContentEditingOutput`.
     pub fn rendered_content_url_for_type_identifier(
         &self,
         type_identifier: &str,
@@ -145,6 +154,7 @@ impl Drop for PHContentEditingOutput {
 }
 
 impl PHContentEditingInput {
+    /// Wraps a Photos framework operation on `PHContentEditingInput`.
     pub fn create_content_editing_output(&self) -> Result<PHContentEditingOutput, PhotoKitError> {
         let mut error = ptr::null_mut();
         let raw =

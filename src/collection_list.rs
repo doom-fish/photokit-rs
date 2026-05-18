@@ -11,8 +11,11 @@ use crate::private::{cstring_from_str, json_cstring, parse_json_ptr};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+/// Wraps `PHCollectionListType`.
 pub enum PHCollectionListType {
+    /// Case of `PHCollectionListType`.
     Folder,
+    /// Case of `PHCollectionListType`.
     SmartFolder,
 }
 
@@ -27,14 +30,23 @@ impl PHCollectionListType {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(transparent)]
-pub struct PHCollectionListSubtype(pub i64);
+/// Wraps `PHCollectionListSubtype`.
+pub struct PHCollectionListSubtype(
+    /// Raw value for `PHCollectionListSubtype`.
+    pub i64,
+);
 
 impl PHCollectionListSubtype {
+    /// Constant on `PHCollectionListSubtype`.
     pub const REGULAR_FOLDER: Self = Self(100);
+    /// Constant on `PHCollectionListSubtype`.
     pub const SMART_FOLDER_EVENTS: Self = Self(200);
+    /// Constant on `PHCollectionListSubtype`.
     pub const SMART_FOLDER_FACES: Self = Self(201);
+    /// Constant on `PHCollectionListSubtype`.
     pub const ANY: Self = Self(i64::MAX);
 
+    /// Returns the raw Photos framework value for `PHCollectionListSubtype`.
     pub const fn raw_value(self) -> i64 {
         self.0
     }
@@ -55,22 +67,33 @@ impl From<PHCollectionListSubtype> for i64 {
 #[allow(clippy::unsafe_derive_deserialize)]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+/// Wraps `PHCollectionList`.
 pub struct PHCollectionList {
+    /// Corresponds to `PHCollectionList.localIdentifier`.
     pub local_identifier: String,
+    /// Corresponds to `PHCollectionList.localizedTitle`.
     pub localized_title: Option<String>,
+    /// Corresponds to `PHCollectionList.collectionListType`.
     pub collection_list_type: PHCollectionListType,
+    /// Corresponds to `PHCollectionList.collectionListSubtype`.
     pub collection_list_subtype: PHCollectionListSubtype,
+    /// Corresponds to `PHCollectionList.startDate`.
     pub start_date: Option<String>,
+    /// Corresponds to `PHCollectionList.endDate`.
     pub end_date: Option<String>,
     #[serde(default)]
+    /// Corresponds to `PHCollectionList.localizedLocationNames`.
     pub localized_location_names: Vec<String>,
     #[serde(default)]
+    /// Corresponds to `PHCollectionList.canContainAssets`.
     pub can_contain_assets: bool,
     #[serde(default)]
+    /// Corresponds to `PHCollectionList.canContainCollections`.
     pub can_contain_collections: bool,
 }
 
 impl PHCollectionList {
+    /// Wraps a Photos framework fetch operation on `PHCollectionList`.
     pub fn fetch_containing_collection_local_identifier(
         collection_local_identifier: &str,
         fetch_options: &PHFetchOptions,
@@ -99,6 +122,7 @@ impl PHCollectionList {
         }
     }
 
+    /// Wraps a Photos framework fetch operation on `PHCollectionList`.
     pub fn fetch_with_local_identifiers(
         identifiers: &[String],
         fetch_options: &PHFetchOptions,
@@ -126,6 +150,7 @@ impl PHCollectionList {
         }
     }
 
+    /// Wraps a Photos framework fetch operation on `PHCollectionList`.
     pub fn fetch_with_type(
         collection_list_type: PHCollectionListType,
         collection_list_subtype: impl Into<PHCollectionListSubtype>,
@@ -152,6 +177,7 @@ impl PHCollectionList {
         }
     }
 
+    /// Looks up `PHCollectionList` from Photos framework identifiers.
     pub fn from_local_identifier(
         local_identifier: impl Into<String>,
     ) -> Result<Option<Self>, PhotoKitError> {
@@ -162,6 +188,7 @@ impl PHCollectionList {
         Ok(result.into_vec().into_iter().next())
     }
 
+    /// Queries Photos framework state exposed by `PHCollectionList`.
     pub fn can_perform_edit_operation(
         &self,
         edit_operation: PHCollectionEditOperation,
@@ -188,6 +215,7 @@ impl PHCollectionList {
         }
     }
 
+    /// Wraps a Photos framework operation on `PHCollectionList`.
     pub fn containing_collection_lists(
         &self,
         fetch_options: &PHFetchOptions,

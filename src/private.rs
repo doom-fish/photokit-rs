@@ -9,12 +9,14 @@ use serde::Serialize;
 use crate::error::PhotoKitError;
 use crate::ffi;
 
+/// Wraps a Photos framework operation.
 pub fn cstring_from_str(value: &str, context: &str) -> Result<CString, PhotoKitError> {
     CString::new(value).map_err(|error| {
         PhotoKitError::InvalidArgument(format!("{context} contains NUL byte: {error}"))
     })
 }
 
+/// Wraps a Photos framework operation.
 pub fn json_cstring<T: Serialize + ?Sized>(
     value: &T,
     context: &str,

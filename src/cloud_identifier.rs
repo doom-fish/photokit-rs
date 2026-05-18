@@ -10,11 +10,14 @@ use crate::private::{json_cstring, parse_json_ptr};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+/// Wraps `PHCloudIdentifier`.
 pub struct PHCloudIdentifier {
+    /// Corresponds to `PHCloudIdentifier.stringValue`.
     pub string_value: String,
 }
 
 impl PHCloudIdentifier {
+    /// Creates a helper value for the related Photos framework API.
     pub fn new(string_value: impl Into<String>) -> Self {
         Self {
             string_value: string_value.into(),
@@ -24,15 +27,21 @@ impl PHCloudIdentifier {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+/// Identifier mapping returned by Photos framework cloud identifier lookups.
 pub struct PHCloudIdentifierMapping {
+    /// Corresponds to `PHCloudIdentifierMapping.cloudIdentifier`.
     pub cloud_identifier: Option<PHCloudIdentifier>,
+    /// Corresponds to `PHCloudIdentifierMapping.error`.
     pub error: Option<NSErrorInfo>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+/// Identifier mapping returned by Photos framework local identifier lookups.
 pub struct PHLocalIdentifierMapping {
+    /// Corresponds to `PHLocalIdentifierMapping.localIdentifier`.
     pub local_identifier: Option<String>,
+    /// Corresponds to `PHLocalIdentifierMapping.error`.
     pub error: Option<NSErrorInfo>,
 }
 
@@ -51,6 +60,7 @@ struct PHLocalIdentifierMappingEntry {
 }
 
 impl PHPhotoLibrary {
+    /// Wraps a Photos framework operation on `PHPhotoLibrary`.
     pub fn cloud_identifier_mappings_for_local_identifiers(
         &self,
         local_identifiers: &[String],
@@ -78,6 +88,7 @@ impl PHPhotoLibrary {
         }
     }
 
+    /// Wraps a Photos framework operation on `PHPhotoLibrary`.
     pub fn local_identifier_mappings_for_cloud_identifiers(
         &self,
         cloud_identifiers: &[PHCloudIdentifier],

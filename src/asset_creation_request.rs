@@ -11,33 +11,47 @@ use crate::private::{json_cstring, take_string};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
+/// Wraps `PHAssetResourceCreationOptions`.
 pub struct PHAssetResourceCreationOptions {
+    /// Corresponds to `PHAssetResourceCreationOptions.originalFilename`.
     pub original_filename: Option<String>,
+    /// Corresponds to `PHAssetResourceCreationOptions.contentTypeIdentifier`.
     pub content_type_identifier: Option<String>,
+    /// Corresponds to `PHAssetResourceCreationOptions.uniformTypeIdentifier`.
     pub uniform_type_identifier: Option<String>,
     #[serde(default)]
+    /// Corresponds to `PHAssetResourceCreationOptions.shouldMoveFile`.
     pub should_move_file: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
+/// Helper input for `PHAssetCreationRequest` resource additions.
 pub struct PHAssetCreationResource {
+    /// Corresponds to `PHAssetCreationResource.resourceType`.
     pub resource_type: PHAssetResourceType,
+    /// Corresponds to `PHAssetCreationResource.fileUrl`.
     pub file_url: Option<String>,
+    /// Corresponds to `PHAssetCreationResource.dataBase64`.
     pub data_base64: Option<String>,
+    /// Corresponds to `PHAssetCreationResource.options`.
     pub options: Option<PHAssetResourceCreationOptions>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Default)]
+/// Wraps `PHAssetCreationRequest`.
 pub struct PHAssetCreationRequest {
+    /// Serialized field carried by `PHAssetCreationRequest`.
     pub resources: Vec<PHAssetCreationResource>,
 }
 
 impl PHAssetCreationRequest {
+    /// Creates a helper value for the related Photos framework API.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Wraps a Photos framework operation on `PHAssetCreationRequest`.
     pub fn add_file_resource(
         mut self,
         resource_type: impl Into<PHAssetResourceType>,
@@ -53,6 +67,7 @@ impl PHAssetCreationRequest {
         self
     }
 
+    /// Wraps a Photos framework operation on `PHAssetCreationRequest`.
     pub fn add_data_resource(
         mut self,
         resource_type: impl Into<PHAssetResourceType>,
@@ -68,6 +83,7 @@ impl PHAssetCreationRequest {
         self
     }
 
+    /// Wraps a Photos framework operation on `PHAssetCreationRequest`.
     pub fn add_data_resource_bytes(
         self,
         resource_type: impl Into<PHAssetResourceType>,
@@ -81,10 +97,12 @@ impl PHAssetCreationRequest {
         )
     }
 
+    /// Queries Photos framework state exposed by `PHAssetCreationRequest`.
     pub fn is_empty(&self) -> bool {
         self.resources.is_empty()
     }
 
+    /// Wraps a Photos framework operation on `PHAssetCreationRequest`.
     pub fn supports_asset_resource_types(
         resource_types: &[PHAssetResourceType],
     ) -> Result<bool, PhotoKitError> {
@@ -108,6 +126,7 @@ impl PHAssetCreationRequest {
         }
     }
 
+    /// Executes the Photos framework operation represented by `PHAssetCreationRequest`.
     pub fn perform(self) -> Result<String, PhotoKitError> {
         let resources_json = json_cstring(&self.resources, "asset creation resources")?;
         let mut error = ptr::null_mut();
@@ -122,6 +141,7 @@ impl PHAssetCreationRequest {
         }
     }
 
+    /// Wraps a Photos framework operation on `PHAssetCreationRequest`.
     pub fn perform_placeholder(self) -> Result<PHObjectPlaceholder, PhotoKitError> {
         self.perform().map(PHObjectPlaceholder::new)
     }

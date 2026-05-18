@@ -17,15 +17,20 @@ use crate::private::{json_cstring, parse_json_ptr};
 #[allow(clippy::unsafe_derive_deserialize)]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+/// Wraps `PHProject`.
 pub struct PHProject {
     #[serde(flatten)]
+    /// Corresponds to `PHProject.assetCollection`.
     pub asset_collection: PHAssetCollection,
+    /// Corresponds to `PHProject.projectExtensionDataBase64`.
     pub project_extension_data_base64: String,
     #[serde(default)]
+    /// Corresponds to `PHProject.hasProjectPreview`.
     pub has_project_preview: bool,
 }
 
 impl PHProject {
+    /// Wraps a Photos framework fetch operation on `PHProject`.
     pub fn fetch_top_level_user_collections(
         fetch_options: &PHFetchOptions,
     ) -> Result<PHFetchResult<Self>, PhotoKitError> {
@@ -41,6 +46,7 @@ impl PHProject {
         }
     }
 
+    /// Wraps a Photos framework fetch operation on `PHProject`.
     pub fn fetch_with_local_identifiers(
         identifiers: &[String],
         fetch_options: &PHFetchOptions,
@@ -65,6 +71,7 @@ impl PHProject {
         }
     }
 
+    /// Looks up `PHProject` from Photos framework identifiers.
     pub fn from_local_identifier(
         local_identifier: impl Into<String>,
     ) -> Result<Option<Self>, PhotoKitError> {
@@ -75,12 +82,14 @@ impl PHProject {
         Ok(result.into_vec().into_iter().next())
     }
 
+    /// Wraps a Photos framework operation on `PHProject`.
     pub fn project_extension_data(&self) -> Vec<u8> {
         base64::engine::general_purpose::STANDARD
             .decode(self.project_extension_data_base64.as_bytes())
             .unwrap_or_default()
     }
 
+    /// Wraps a Photos framework operation on `PHProject`.
     pub fn collection(&self) -> PHCollection {
         PHCollection {
             local_identifier: self.local_identifier.clone(),
@@ -102,16 +111,23 @@ impl Deref for PHProject {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
+/// Wraps `PHProjectChangeRequest`.
 pub struct PHProjectChangeRequest {
+    /// Serialized field carried by `PHProjectChangeRequest`.
     pub project_local_identifier: String,
+    /// Serialized field carried by `PHProjectChangeRequest`.
     pub title: Option<String>,
+    /// Serialized field carried by `PHProjectChangeRequest`.
     pub project_extension_data_base64: Option<String>,
+    /// Serialized field carried by `PHProjectChangeRequest`.
     pub project_preview_image_file_url: Option<String>,
     #[serde(default)]
+    /// Serialized field carried by `PHProjectChangeRequest`.
     pub remove_asset_identifiers: Vec<String>,
 }
 
 impl PHProjectChangeRequest {
+    /// Wraps a Photos framework operation on `PHProjectChangeRequest`.
     pub fn change_request_for_project(project: &PHProject) -> Self {
         Self {
             project_local_identifier: project.local_identifier.clone(),
@@ -119,27 +135,32 @@ impl PHProjectChangeRequest {
         }
     }
 
+    /// Updates the wrapped Photos framework value on `PHProjectChangeRequest`.
     pub fn set_title(mut self, title: impl Into<String>) -> Self {
         self.title = Some(title.into());
         self
     }
 
+    /// Updates the wrapped Photos framework value on `PHProjectChangeRequest`.
     pub fn set_project_extension_data(mut self, data_base64: impl Into<String>) -> Self {
         self.project_extension_data_base64 = Some(data_base64.into());
         self
     }
 
+    /// Updates the wrapped Photos framework value on `PHProjectChangeRequest`.
     pub fn set_project_extension_data_bytes(mut self, data: &[u8]) -> Self {
         self.project_extension_data_base64 =
             Some(base64::engine::general_purpose::STANDARD.encode(data));
         self
     }
 
+    /// Updates the wrapped Photos framework value on `PHProjectChangeRequest`.
     pub fn set_project_preview_image_file_url(mut self, file_url: impl Into<String>) -> Self {
         self.project_preview_image_file_url = Some(file_url.into());
         self
     }
 
+    /// Wraps a Photos framework operation on `PHProjectChangeRequest`.
     pub fn remove_assets(mut self, assets: &[PHAsset]) -> Self {
         self.remove_asset_identifiers = assets
             .iter()

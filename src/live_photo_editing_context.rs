@@ -18,46 +18,71 @@ type FrameProcessorCallback =
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct PHLivePhotoFrameType(pub i64);
+/// Wraps `PHLivePhotoFrameType`.
+pub struct PHLivePhotoFrameType(
+    /// Raw value for `PHLivePhotoFrameType`.
+    pub i64,
+);
 
 impl PHLivePhotoFrameType {
+    /// Constant on `PHLivePhotoFrameType`.
     pub const PHOTO: Self = Self(0);
+    /// Constant on `PHLivePhotoFrameType`.
     pub const VIDEO: Self = Self(1);
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+/// Serialized frame payload delivered to a `PHLivePhotoEditingContext` frame processor.
 pub struct PHLivePhotoFrame {
+    /// Corresponds to `PHLivePhotoFrame.frameType`.
     pub frame_type: PHLivePhotoFrameType,
+    /// Corresponds to `PHLivePhotoFrame.timeSeconds`.
     pub time_seconds: f64,
+    /// Corresponds to `PHLivePhotoFrame.renderScale`.
     pub render_scale: f64,
+    /// Corresponds to `PHLivePhotoFrame.imageWidth`.
     pub image_width: f64,
+    /// Corresponds to `PHLivePhotoFrame.imageHeight`.
     pub image_height: f64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Decision returned from a `PHLivePhotoEditingContext` frame processor.
 pub enum PHLivePhotoFrameProcessingDecision {
+    /// Case of `PHLivePhotoFrameProcessingDecision`.
     KeepOriginal,
+    /// Case of `PHLivePhotoFrameProcessingDecision`.
     SkipFrame,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+/// Serialized snapshot of `PHLivePhotoEditingContext` properties.
 pub struct PHLivePhotoEditingContextInfo {
+    /// Corresponds to `PHLivePhotoEditingContextInfo.fullSizeImageWidth`.
     pub full_size_image_width: f64,
+    /// Corresponds to `PHLivePhotoEditingContextInfo.fullSizeImageHeight`.
     pub full_size_image_height: f64,
+    /// Corresponds to `PHLivePhotoEditingContextInfo.durationSeconds`.
     pub duration_seconds: f64,
+    /// Corresponds to `PHLivePhotoEditingContextInfo.photoTimeSeconds`.
     pub photo_time_seconds: f64,
+    /// Corresponds to `PHLivePhotoEditingContextInfo.audioVolume`.
     pub audio_volume: f32,
+    /// Corresponds to `PHLivePhotoEditingContextInfo.orientation`.
     pub orientation: i32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+/// Serialized result from `PHLivePhotoEditingContext.saveLivePhoto`.
 pub struct PHLivePhotoEditingSaveResult {
+    /// Corresponds to `PHLivePhotoEditingSaveResult.success`.
     pub success: bool,
 }
 
+/// Wraps `PHLivePhotoEditingContext`.
 pub struct PHLivePhotoEditingContext {
     raw: NonNull<c_void>,
     info: PHLivePhotoEditingContextInfo,
@@ -65,6 +90,7 @@ pub struct PHLivePhotoEditingContext {
 }
 
 impl PHLivePhotoEditingContext {
+    /// Creates a helper value for the related Photos framework API.
     pub fn new(input: &PHContentEditingInput) -> Result<Self, PhotoKitError> {
         let mut error = ptr::null_mut();
         let raw = unsafe { ffi::ph_live_photo_editing_context_new(input.raw.as_ptr(), &mut error) };
@@ -87,10 +113,12 @@ impl PHLivePhotoEditingContext {
         Ok(context)
     }
 
+    /// Returns the cached Photos framework snapshot for `PHLivePhotoEditingContext`.
     pub fn snapshot(&self) -> &PHLivePhotoEditingContextInfo {
         &self.info
     }
 
+    /// Updates the wrapped Photos framework value on `PHLivePhotoEditingContext`.
     pub fn set_audio_volume(&mut self, audio_volume: f32) -> Result<(), PhotoKitError> {
         let mut error = ptr::null_mut();
         let status = unsafe {
@@ -107,6 +135,7 @@ impl PHLivePhotoEditingContext {
         }
     }
 
+    /// Updates the wrapped Photos framework value on `PHLivePhotoEditingContext`.
     pub fn set_frame_processor<F>(&mut self, callback: F) -> Result<(), PhotoKitError>
     where
         F: FnMut(PHLivePhotoFrame) -> PHLivePhotoFrameProcessingDecision + Send + 'static,
@@ -144,6 +173,7 @@ impl PHLivePhotoEditingContext {
         }
     }
 
+    /// Clears Photos framework state on `PHLivePhotoEditingContext`.
     pub fn clear_frame_processor(&mut self) {
         // SAFETY: `self.raw` is a valid editing context pointer.
         unsafe { ffi::ph_live_photo_editing_context_clear_frame_processor(self.raw.as_ptr()) };
@@ -160,6 +190,7 @@ impl PHLivePhotoEditingContext {
         }
     }
 
+    /// Wraps a Photos framework operation on `PHLivePhotoEditingContext`.
     pub fn prepare_live_photo_for_playback(
         &self,
         target_width: f64,
@@ -185,6 +216,7 @@ impl PHLivePhotoEditingContext {
         }
     }
 
+    /// Wraps a Photos framework operation on `PHLivePhotoEditingContext`.
     pub fn save_live_photo_to_output(
         &self,
         output: &PHContentEditingOutput,
@@ -206,6 +238,7 @@ impl PHLivePhotoEditingContext {
         }
     }
 
+    /// Cancels the Photos framework operation represented by `PHLivePhotoEditingContext`.
     pub fn cancel(&self) {
         unsafe { ffi::ph_live_photo_editing_context_cancel(self.raw.as_ptr()) };
     }

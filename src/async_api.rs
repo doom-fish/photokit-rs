@@ -7,12 +7,12 @@
 //!
 //! | Type | Description |
 //! |------|-------------|
-//! | [`AsyncPHPhotoLibrary`] | Async authorization + `performChanges` entrypoints |
-//! | [`AsyncPHAssetChangeRequest`] | Async asset change requests |
-//! | [`AsyncPHAssetCollectionChangeRequest`] | Async asset-collection change requests |
-//! | [`AsyncPHCollectionListChangeRequest`] | Async collection-list change requests |
-//! | [`AsyncPHImageManager`] | Async image + image-data requests |
-//! | [`AsyncPHLivePhotoEditingContext`] | Async live photo save + prepare |
+//! | [`AsyncPHPhotoLibrary`](crate::async_api::AsyncPHPhotoLibrary) | Async authorization + `performChanges` entrypoints |
+//! | [`AsyncPHAssetChangeRequest`](crate::async_api::AsyncPHAssetChangeRequest) | Async asset change requests |
+//! | [`AsyncPHAssetCollectionChangeRequest`](crate::async_api::AsyncPHAssetCollectionChangeRequest) | Async asset-collection change requests |
+//! | [`AsyncPHCollectionListChangeRequest`](crate::async_api::AsyncPHCollectionListChangeRequest) | Async collection-list change requests |
+//! | [`AsyncPHImageManager`](crate::async_api::AsyncPHImageManager) | Async image + image-data requests |
+//! | [`AsyncPHLivePhotoEditingContext`](crate::async_api::AsyncPHLivePhotoEditingContext) | Async live photo save + prepare |
 //!
 //! ## Notes
 //! - `PHCachingImageManager::start/stop_caching_images` are synchronous; use the

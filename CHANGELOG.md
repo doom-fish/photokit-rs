@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.4 - 2026-05-18
+
+- Added rustdoc coverage across the public API, including modules, types, variants, fields, and methods with Photos framework counterpart references.
+- Reached 100.0% rustdoc item coverage for the crate.
+
 ## 0.3.3 - 2026-05-18
 
 - Re-exported `JsonCallback` from `doom-fish-utils::ffi_callbacks` and removed the duplicate local FFI typedef.

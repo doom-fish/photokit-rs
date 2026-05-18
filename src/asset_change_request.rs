@@ -16,24 +16,37 @@ struct PHChangeRequestPerformResult {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
+/// Wraps `PHAssetChangeRequest`.
 pub struct PHAssetChangeRequest {
+    /// Serialized field carried by `PHAssetChangeRequest`.
     pub asset_local_identifier: Option<String>,
+    /// Serialized field carried by `PHAssetChangeRequest`.
     pub create_image_file_url: Option<String>,
+    /// Serialized field carried by `PHAssetChangeRequest`.
     pub create_image_data_base64: Option<String>,
+    /// Serialized field carried by `PHAssetChangeRequest`.
     pub create_video_file_url: Option<String>,
+    /// Serialized field carried by `PHAssetChangeRequest`.
     pub set_creation_date: Option<String>,
     #[serde(default)]
+    /// Serialized field carried by `PHAssetChangeRequest`.
     pub clear_creation_date: bool,
+    /// Serialized field carried by `PHAssetChangeRequest`.
     pub set_location: Option<PHCoordinate>,
     #[serde(default)]
+    /// Serialized field carried by `PHAssetChangeRequest`.
     pub clear_location: bool,
+    /// Serialized field carried by `PHAssetChangeRequest`.
     pub favorite: Option<bool>,
+    /// Serialized field carried by `PHAssetChangeRequest`.
     pub hidden: Option<bool>,
     #[serde(default)]
+    /// Serialized field carried by `PHAssetChangeRequest`.
     pub revert_asset_content_to_original: bool,
 }
 
 impl PHAssetChangeRequest {
+    /// Wraps a Photos framework operation on `PHAssetChangeRequest`.
     pub fn change_request_for_asset(asset: &PHAsset) -> Self {
         Self {
             asset_local_identifier: Some(asset.local_identifier.clone()),
@@ -41,6 +54,7 @@ impl PHAssetChangeRequest {
         }
     }
 
+    /// Wraps a Photos framework operation on `PHAssetChangeRequest`.
     pub fn creation_request_for_asset_from_image_file_url(file_url: impl Into<String>) -> Self {
         Self {
             create_image_file_url: Some(file_url.into()),
@@ -48,6 +62,7 @@ impl PHAssetChangeRequest {
         }
     }
 
+    /// Wraps a Photos framework operation on `PHAssetChangeRequest`.
     pub fn creation_request_for_asset_from_image_data(data: &[u8]) -> Self {
         Self {
             create_image_data_base64: Some(base64::engine::general_purpose::STANDARD.encode(data)),
@@ -55,6 +70,7 @@ impl PHAssetChangeRequest {
         }
     }
 
+    /// Wraps a Photos framework operation on `PHAssetChangeRequest`.
     pub fn creation_request_for_asset_from_video_file_url(file_url: impl Into<String>) -> Self {
         Self {
             create_video_file_url: Some(file_url.into()),
@@ -62,45 +78,53 @@ impl PHAssetChangeRequest {
         }
     }
 
+    /// Updates the wrapped Photos framework value on `PHAssetChangeRequest`.
     pub fn set_creation_date(mut self, creation_date: impl Into<String>) -> Self {
         self.set_creation_date = Some(creation_date.into());
         self.clear_creation_date = false;
         self
     }
 
+    /// Clears Photos framework state on `PHAssetChangeRequest`.
     pub fn clear_creation_date(mut self) -> Self {
         self.set_creation_date = None;
         self.clear_creation_date = true;
         self
     }
 
+    /// Updates the wrapped Photos framework value on `PHAssetChangeRequest`.
     pub fn set_location(mut self, location: PHCoordinate) -> Self {
         self.set_location = Some(location);
         self.clear_location = false;
         self
     }
 
+    /// Clears Photos framework state on `PHAssetChangeRequest`.
     pub fn clear_location(mut self) -> Self {
         self.set_location = None;
         self.clear_location = true;
         self
     }
 
+    /// Updates the wrapped Photos framework value on `PHAssetChangeRequest`.
     pub fn set_favorite(mut self, favorite: bool) -> Self {
         self.favorite = Some(favorite);
         self
     }
 
+    /// Updates the wrapped Photos framework value on `PHAssetChangeRequest`.
     pub fn set_hidden(mut self, hidden: bool) -> Self {
         self.hidden = Some(hidden);
         self
     }
 
+    /// Wraps a Photos framework operation on `PHAssetChangeRequest`.
     pub fn revert_asset_content_to_original(mut self) -> Self {
         self.revert_asset_content_to_original = true;
         self
     }
 
+    /// Wraps a Photos framework operation on `PHAssetChangeRequest`.
     pub fn delete_assets(assets: &[PHAsset]) -> Result<(), PhotoKitError> {
         let identifiers: Vec<&str> = assets
             .iter()

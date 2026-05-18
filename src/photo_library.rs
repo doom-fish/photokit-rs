@@ -25,14 +25,19 @@ enum ChangeCallbackKind {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
+/// Serialized payload delivered by `PHPhotoLibrary` availability observers.
 pub struct PHPhotoLibraryAvailabilityChange {
+    /// Corresponds to `PHPhotoLibraryAvailabilityChange.unavailabilityReason`.
     pub unavailability_reason: Option<NSErrorInfo>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+/// Wraps `PHAccessLevel`.
 pub enum PHAccessLevel {
+    /// Case of `PHAccessLevel`.
     AddOnly,
+    /// Case of `PHAccessLevel`.
     ReadWrite,
 }
 
@@ -46,16 +51,20 @@ impl PHAccessLevel {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+/// Summary payload delivered by `PHPhotoLibrary` change observers.
 pub struct PHPhotoLibraryChange {
+    /// Corresponds to `PHPhotoLibraryChange.changeCount`.
     pub change_count: u64,
 }
 
 #[derive(Debug)]
+/// Wraps `PHPhotoLibrary`.
 pub struct PHPhotoLibrary {
     pub(crate) raw: NonNull<c_void>,
 }
 
 impl PHPhotoLibrary {
+    /// Returns the shared Photos framework `PHPhotoLibrary` instance.
     pub fn shared() -> Result<Self, PhotoKitError> {
         let raw = NonNull::new(unsafe { ffi::ph_photo_library_shared() }).ok_or_else(|| {
             PhotoKitError::OperationFailed("failed to get shared PHPhotoLibrary".to_owned())
@@ -63,14 +72,17 @@ impl PHPhotoLibrary {
         Ok(Self { raw })
     }
 
+    /// Wraps a Photos framework operation on `PHPhotoLibrary`.
     pub fn authorization_status() -> PHAuthorizationStatus {
         PHAuthorizationStatus::from_raw(unsafe { ffi::ph_authorization_status() })
     }
 
+    /// Wraps a Photos framework request operation on `PHPhotoLibrary`.
     pub fn request_authorization() -> Result<PHAuthorizationStatus, PhotoKitError> {
         Self::request_authorization_for_access_level(PHAccessLevel::ReadWrite)
     }
 
+    /// Wraps a Photos framework operation on `PHPhotoLibrary`.
     pub fn authorization_status_for_access_level(
         access_level: PHAccessLevel,
     ) -> PHAuthorizationStatus {
@@ -79,6 +91,7 @@ impl PHPhotoLibrary {
         })
     }
 
+    /// Wraps a Photos framework request operation on `PHPhotoLibrary`.
     pub fn request_authorization_for_access_level(
         access_level: PHAccessLevel,
     ) -> Result<PHAuthorizationStatus, PhotoKitError> {
@@ -93,6 +106,7 @@ impl PHPhotoLibrary {
         }
     }
 
+    /// Wraps a Photos framework fetch operation on `PHPhotoLibrary`.
     pub fn fetch_asset_collections(
         &self,
         fetch_options: &PHFetchOptions,
@@ -100,12 +114,14 @@ impl PHPhotoLibrary {
         PHAssetCollection::fetch(fetch_options)
     }
 
+    /// Wraps a Photos framework fetch operation on `PHPhotoLibrary`.
     pub fn fetch_assets(
         fetch_options: &PHFetchOptions,
     ) -> Result<PHFetchResult<PHAsset>, PhotoKitError> {
         PHAsset::fetch(fetch_options)
     }
 
+    /// Wraps a Photos framework operation on `PHPhotoLibrary`.
     pub fn unavailability_reason(&self) -> Result<Option<NSErrorInfo>, PhotoKitError> {
         let mut error = ptr::null_mut();
         let payload = unsafe {
@@ -120,6 +136,7 @@ impl PHPhotoLibrary {
         }
     }
 
+    /// Wraps a Photos framework operation on `PHPhotoLibrary`.
     pub fn register_change_observer<F>(
         &self,
         callback: F,
@@ -130,6 +147,7 @@ impl PHPhotoLibrary {
         self.register_change_observer_impl(ChangeCallbackKind::Summary(Box::new(callback)))
     }
 
+    /// Wraps a Photos framework operation on `PHPhotoLibrary`.
     pub fn register_detailed_change_observer<F>(
         &self,
         callback: F,
@@ -140,6 +158,7 @@ impl PHPhotoLibrary {
         self.register_change_observer_impl(ChangeCallbackKind::Detailed(Box::new(callback)))
     }
 
+    /// Wraps a Photos framework operation on `PHPhotoLibrary`.
     pub fn register_availability_observer<F>(
         &self,
         callback: F,
@@ -185,6 +204,7 @@ impl PHPhotoLibrary {
         }
     }
 
+    /// Wraps a Photos framework operation on `PHPhotoLibrary`.
     pub fn current_change_token(&self) -> Result<PHPersistentChangeToken, PhotoKitError> {
         let mut error = ptr::null_mut();
         let payload = unsafe {
@@ -199,6 +219,7 @@ impl PHPhotoLibrary {
         }
     }
 
+    /// Wraps a Photos framework fetch operation on `PHPhotoLibrary`.
     pub fn fetch_persistent_changes_since_token(
         &self,
         token: &PHPersistentChangeToken,
@@ -261,6 +282,7 @@ impl Drop for PHPhotoLibrary {
     }
 }
 
+/// RAII registration token for `PHPhotoLibrary` change observations.
 pub struct PHChangeObserver {
     raw: NonNull<c_void>,
     user_info: NonNull<c_void>,
@@ -288,6 +310,7 @@ impl Drop for PHChangeObserver {
     }
 }
 
+/// RAII registration token for `PHPhotoLibrary` availability observations.
 pub struct PHAvailabilityObserver {
     raw: NonNull<c_void>,
     user_info: NonNull<c_void>,

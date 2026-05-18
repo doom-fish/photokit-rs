@@ -15,37 +15,66 @@
     clippy::type_complexity
 )]
 
+/// Wraps `PHAsset`, `PHAssetResource`, and related Photos framework asset types.
 pub mod asset;
+/// Wraps `PHAssetChangeRequest` mutation APIs.
 pub mod asset_change_request;
+/// Wraps `PHAssetCollection` and related Photos framework collection types.
 pub mod asset_collection;
+/// Wraps `PHAssetCollectionChangeRequest` mutation APIs.
 pub mod asset_collection_change_request;
+/// Wraps `PHAssetCreationRequest` creation APIs.
 pub mod asset_creation_request;
+/// Wraps `PHAssetResourceManager`.
 pub mod asset_resource_manager;
 #[cfg(feature = "async")]
+/// Async wrappers for Photos framework completion-handler APIs.
 pub mod async_api;
+/// Wraps `PHChange`.
 pub mod change;
+/// Traits for Photos framework change-request wrappers.
 pub mod change_request;
+/// Wraps `PHCloudIdentifier` and related Photos framework identifier mappings.
 pub mod cloud_identifier;
+/// Wraps `PHCollection`.
 pub mod collection;
+/// Wraps `PHCollectionList` and related Photos framework list types.
 pub mod collection_list;
+/// Wraps `PHCollectionListChangeRequest` mutation APIs.
 pub mod collection_list_change_request;
+/// Wraps `PHContentEditingInput` and related Photos framework editing-input types.
 pub mod content_editing_input;
+/// Wraps `PHContentEditingOutput` and related Photos framework editing-output types.
 pub mod content_editing_output;
+/// Wraps Photos framework authorization and error values.
 pub mod error;
+/// Wraps `PHFetchOptions`.
 pub mod fetch_options;
+/// Wraps `PHFetchResult`.
 pub mod fetch_result;
+/// Wraps `PHFetchResultChangeDetails`.
 pub mod fetch_result_change_details;
 mod ffi;
+/// Wraps `PHImageManager` and `PHCachingImageManager`.
 pub mod image_manager;
+/// Re-exports Photos framework wrapper types.
 pub mod library;
+/// Wraps `PHLivePhoto` and related request results.
 pub mod live_photo;
+/// Wraps `PHLivePhotoEditingContext` and related frame-processing types.
 pub mod live_photo_editing_context;
+/// Wraps `PHObject` and `PHObjectPlaceholder`.
 pub mod object;
+/// Wraps `PHObjectChangeDetails`.
 pub mod object_change_details;
+/// Wraps persistent change history Photos framework types.
 pub mod persistent_change;
+/// Wraps `PHPhotoLibrary` and observer registration APIs.
 pub mod photo_library;
 mod private;
+/// Wraps `PHProject` and `PHProjectChangeRequest`.
 pub mod project;
+/// Re-exports shared Photos framework wrapper types.
 pub mod types;
 
 pub use asset::{

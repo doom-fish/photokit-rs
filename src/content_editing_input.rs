@@ -12,13 +12,18 @@ use crate::private::{json_cstring, parse_json_ptr};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+/// Wraps `PHAdjustmentData`.
 pub struct PHAdjustmentData {
+    /// Corresponds to `PHAdjustmentData.formatIdentifier`.
     pub format_identifier: String,
+    /// Corresponds to `PHAdjustmentData.formatVersion`.
     pub format_version: String,
+    /// Corresponds to `PHAdjustmentData.dataBase64`.
     pub data_base64: String,
 }
 
 impl PHAdjustmentData {
+    /// Decodes the binary data carried by `PHAdjustmentData`.
     pub fn data(&self) -> Vec<u8> {
         base64::engine::general_purpose::STANDARD
             .decode(self.data_base64.as_bytes())
@@ -28,10 +33,13 @@ impl PHAdjustmentData {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+/// Wraps `PHContentEditingInputRequestOptions`.
 pub struct PHContentEditingInputRequestOptions {
     #[serde(default)]
+    /// Serialized field carried by `PHContentEditingInputRequestOptions`.
     pub network_access_allowed: bool,
     #[serde(default = "default_true")]
+    /// Serialized field carried by `PHContentEditingInputRequestOptions`.
     pub accepts_any_adjustment_data: bool,
 }
 
@@ -50,28 +58,47 @@ impl Default for PHContentEditingInputRequestOptions {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+/// Serialized snapshot of `PHContentEditingInput` properties.
 pub struct PHContentEditingInputInfo {
+    /// Corresponds to `PHContentEditingInputInfo.mediaType`.
     pub media_type: PHMediaType,
+    /// Corresponds to `PHContentEditingInputInfo.mediaSubtypes`.
     pub media_subtypes: u64,
+    /// Corresponds to `PHContentEditingInputInfo.creationDate`.
     pub creation_date: Option<String>,
+    /// Corresponds to `PHContentEditingInputInfo.location`.
     pub location: Option<PHCoordinate>,
+    /// Corresponds to `PHContentEditingInputInfo.contentTypeIdentifier`.
     pub content_type_identifier: Option<String>,
+    /// Corresponds to `PHContentEditingInputInfo.uniformTypeIdentifier`.
     pub uniform_type_identifier: Option<String>,
+    /// Corresponds to `PHContentEditingInputInfo.playbackStyle`.
     pub playback_style: Option<PHAssetPlaybackStyle>,
+    /// Corresponds to `PHContentEditingInputInfo.adjustmentData`.
     pub adjustment_data: Option<PHAdjustmentData>,
     #[serde(default)]
+    /// Corresponds to `PHContentEditingInputInfo.hasDisplaySizeImage`.
     pub has_display_size_image: bool,
+    /// Corresponds to `PHContentEditingInputInfo.displaySizeImageWidth`.
     pub display_size_image_width: Option<f64>,
+    /// Corresponds to `PHContentEditingInputInfo.displaySizeImageHeight`.
     pub display_size_image_height: Option<f64>,
+    /// Corresponds to `PHContentEditingInputInfo.fullSizeImageUrl`.
     pub full_size_image_url: Option<String>,
+    /// Corresponds to `PHContentEditingInputInfo.fullSizeImageOrientation`.
     pub full_size_image_orientation: i32,
+    /// Corresponds to `PHContentEditingInputInfo.audiovisualAssetClass`.
     pub audiovisual_asset_class: Option<String>,
     #[serde(default)]
+    /// Corresponds to `PHContentEditingInputInfo.hasLivePhoto`.
     pub has_live_photo: bool,
+    /// Corresponds to `PHContentEditingInputInfo.livePhotoSizeWidth`.
     pub live_photo_size_width: Option<f64>,
+    /// Corresponds to `PHContentEditingInputInfo.livePhotoSizeHeight`.
     pub live_photo_size_height: Option<f64>,
 }
 
+/// Wraps `PHContentEditingInput`.
 pub struct PHContentEditingInput {
     pub(crate) raw: NonNull<c_void>,
     info: PHContentEditingInputInfo,
@@ -97,6 +124,7 @@ impl PHContentEditingInput {
         }
     }
 
+    /// Returns the cached Photos framework snapshot for `PHContentEditingInput`.
     pub fn snapshot(&self) -> &PHContentEditingInputInfo {
         &self.info
     }
@@ -125,6 +153,7 @@ impl Drop for PHContentEditingInput {
 }
 
 impl PHAsset {
+    /// Wraps a Photos framework request operation on `PHAsset`.
     pub fn request_content_editing_input(
         &self,
         options: &PHContentEditingInputRequestOptions,

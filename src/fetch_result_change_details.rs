@@ -4,40 +4,56 @@ use crate::fetch_result::PHFetchResult;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+/// Move information derived from `PHFetchResultChangeDetails`.
 pub struct PHFetchResultMove {
+    /// Corresponds to `PHFetchResultMove.fromIndex`.
     pub from_index: usize,
+    /// Corresponds to `PHFetchResultMove.toIndex`.
     pub to_index: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+/// Wraps `PHFetchResultChangeDetails`.
 pub struct PHFetchResultChangeDetails<T> {
+    /// Corresponds to `PHFetchResultChangeDetails.fetchResultBeforeChanges`.
     pub fetch_result_before_changes: PHFetchResult<T>,
+    /// Corresponds to `PHFetchResultChangeDetails.fetchResultAfterChanges`.
     pub fetch_result_after_changes: PHFetchResult<T>,
+    /// Corresponds to `PHFetchResultChangeDetails.hasIncrementalChanges`.
     pub has_incremental_changes: bool,
     #[serde(default)]
+    /// Corresponds to `PHFetchResultChangeDetails.removedIndexes`.
     pub removed_indexes: Vec<usize>,
     #[serde(default)]
+    /// Corresponds to `PHFetchResultChangeDetails.removedObjects`.
     pub removed_objects: Vec<T>,
     #[serde(default)]
+    /// Corresponds to `PHFetchResultChangeDetails.insertedIndexes`.
     pub inserted_indexes: Vec<usize>,
     #[serde(default)]
+    /// Corresponds to `PHFetchResultChangeDetails.insertedObjects`.
     pub inserted_objects: Vec<T>,
     #[serde(default)]
+    /// Corresponds to `PHFetchResultChangeDetails.changedIndexes`.
     pub changed_indexes: Vec<usize>,
     #[serde(default)]
+    /// Corresponds to `PHFetchResultChangeDetails.changedObjects`.
     pub changed_objects: Vec<T>,
     #[serde(default)]
+    /// Corresponds to `PHFetchResultChangeDetails.moves`.
     pub moves: Vec<PHFetchResultMove>,
 }
 
 impl<T> PHFetchResultChangeDetails<T> {
+    /// Queries Photos framework state exposed by `PHFetchResultChangeDetails`.
     pub fn has_moves(&self) -> bool {
         !self.moves.is_empty()
     }
 }
 
 impl<T: Clone + PartialEq> PHFetchResultChangeDetails<T> {
+    /// Wraps a Photos framework operation on `PHFetchResultChangeDetails`.
     pub fn change_details_from_fetch_result(
         from_result: &PHFetchResult<T>,
         to_result: &PHFetchResult<T>,

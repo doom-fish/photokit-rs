@@ -8,33 +8,47 @@ use crate::image_manager::{PHImageRequest, PHLivePhotoRequestHandle};
 use crate::private::json_cstring;
 
 #[allow(non_upper_case_globals)]
+/// Matches `PHLivePhotoInfoErrorKey`.
 pub const PHLivePhotoInfoErrorKey: &str = "PHLivePhotoInfoErrorKey";
 
 #[derive(Debug, Clone, PartialEq, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
+/// Wraps `PHLivePhoto`.
 pub struct PHLivePhoto {
+    /// Serialized field carried by `PHLivePhoto`.
     pub available: bool,
+    /// Serialized field carried by `PHLivePhoto`.
     pub size_width: f64,
+    /// Serialized field carried by `PHLivePhoto`.
     pub size_height: f64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+/// Serialized result delivered by live photo request APIs.
 pub struct PHLivePhotoResult {
+    /// Serialized field carried by `PHLivePhotoResult`.
     pub has_live_photo: bool,
+    /// Serialized field carried by `PHLivePhotoResult`.
     pub cancelled: bool,
+    /// Serialized field carried by `PHLivePhotoResult`.
     pub degraded: bool,
     #[serde(default)]
+    /// Serialized field carried by `PHLivePhotoResult`.
     pub size_width: f64,
     #[serde(default)]
+    /// Serialized field carried by `PHLivePhotoResult`.
     pub size_height: f64,
     #[serde(default)]
+    /// Serialized field carried by `PHLivePhotoResult`.
     pub request_id: Option<i32>,
     #[serde(default)]
+    /// Serialized field carried by `PHLivePhotoResult`.
     pub error: Option<NSErrorInfo>,
 }
 
 impl PHLivePhotoResult {
+    /// Wraps a Photos framework operation on `PHLivePhotoResult`.
     pub fn live_photo(&self) -> Option<PHLivePhoto> {
         self.has_live_photo.then_some(PHLivePhoto {
             available: true,
@@ -45,6 +59,7 @@ impl PHLivePhotoResult {
 }
 
 impl PHLivePhoto {
+    /// Wraps a Photos framework request operation on `PHLivePhoto`.
     pub fn request_with_resource_file_urls(
         file_urls: &[String],
         request: &PHImageRequest,

@@ -14,31 +14,42 @@ use crate::private::{cstring_from_str, json_cstring, parse_json_ptr};
 #[allow(clippy::unsafe_derive_deserialize)]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+/// Wraps `PHCollection`.
 pub struct PHCollection {
+    /// Corresponds to `PHCollection.localIdentifier`.
     pub local_identifier: String,
+    /// Corresponds to `PHCollection.localizedTitle`.
     pub localized_title: Option<String>,
+    /// Corresponds to `PHCollection.canContainAssets`.
     pub can_contain_assets: bool,
+    /// Corresponds to `PHCollection.canContainCollections`.
     pub can_contain_collections: bool,
+    /// Corresponds to `PHCollection.kind`.
     pub kind: String,
 }
 
 impl PHCollection {
+    /// Wraps a Photos framework operation on `PHCollection`.
     pub fn object(&self) -> PHObject {
         PHObject::new(self.local_identifier.clone())
     }
 
+    /// Queries Photos framework state exposed by `PHCollection`.
     pub fn is_asset_collection(&self) -> bool {
         self.kind == "assetCollection"
     }
 
+    /// Queries Photos framework state exposed by `PHCollection`.
     pub fn is_collection_list(&self) -> bool {
         self.kind == "collectionList"
     }
 
+    /// Queries Photos framework state exposed by `PHCollection`.
     pub fn is_project(&self) -> bool {
         self.kind == "project"
     }
 
+    /// Wraps a Photos framework fetch operation on `PHCollection`.
     pub fn fetch_collections_in_collection_list(
         collection_list: &PHCollectionList,
         fetch_options: &PHFetchOptions,
@@ -64,6 +75,7 @@ impl PHCollection {
         }
     }
 
+    /// Wraps a Photos framework fetch operation on `PHCollection`.
     pub fn fetch_top_level_user_collections(
         fetch_options: &PHFetchOptions,
     ) -> Result<PHFetchResult<Self>, PhotoKitError> {
@@ -85,6 +97,7 @@ impl PHCollection {
         }
     }
 
+    /// Queries Photos framework state exposed by `PHCollection`.
     pub fn can_perform_edit_operation(
         &self,
         edit_operation: PHCollectionEditOperation,
@@ -107,10 +120,12 @@ impl PHCollection {
         }
     }
 
+    /// Wraps a Photos framework operation on `PHCollection`.
     pub fn asset_collection(&self) -> Result<Option<PHAssetCollection>, PhotoKitError> {
         PHAssetCollection::from_local_identifier(self.local_identifier.clone())
     }
 
+    /// Wraps a Photos framework operation on `PHCollection`.
     pub fn collection_list(&self) -> Result<Option<PHCollectionList>, PhotoKitError> {
         PHCollectionList::from_local_identifier(self.local_identifier.clone())
     }

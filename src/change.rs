@@ -9,6 +9,7 @@ use crate::ffi;
 use crate::object_change_details::PHObjectChangeDetails;
 use crate::private::{cstring_from_str, parse_json_ptr};
 
+/// Wraps `PHChange`.
 pub struct PHChange {
     pub(crate) raw: NonNull<c_void>,
 }
@@ -20,6 +21,7 @@ impl PHChange {
         }
     }
 
+    /// Wraps a Photos framework operation on `PHChange`.
     pub fn asset_change_details(
         &self,
         asset: &PHAsset,
@@ -42,6 +44,7 @@ impl PHChange {
         }
     }
 
+    /// Wraps a Photos framework operation on `PHChange`.
     pub fn asset_collection_change_details(
         &self,
         collection: &PHAssetCollection,
@@ -65,6 +68,7 @@ impl PHChange {
         }
     }
 
+    /// Wraps a Photos framework operation on `PHChange`.
     pub fn collection_list_change_details(
         &self,
         collection_list: &PHCollectionList,

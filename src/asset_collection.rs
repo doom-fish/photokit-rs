@@ -12,19 +12,30 @@ use crate::private::{cstring_from_str, json_cstring, parse_json_ptr};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+/// Wraps `PHAssetCollectionType`.
 pub enum PHAssetCollectionType {
+    /// Case of `PHAssetCollectionType`.
     Album,
+    /// Case of `PHAssetCollectionType`.
     SmartAlbum,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+/// Wraps `PHCollectionEditOperation`.
 pub enum PHCollectionEditOperation {
+    /// Case of `PHCollectionEditOperation`.
     DeleteContent,
+    /// Case of `PHCollectionEditOperation`.
     RemoveContent,
+    /// Case of `PHCollectionEditOperation`.
     AddContent,
+    /// Case of `PHCollectionEditOperation`.
     CreateContent,
+    /// Case of `PHCollectionEditOperation`.
     RearrangeContent,
+    /// Case of `PHCollectionEditOperation`.
     Delete,
+    /// Case of `PHCollectionEditOperation`.
     Rename,
 }
 
@@ -44,39 +55,73 @@ impl PHCollectionEditOperation {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(transparent)]
-pub struct PHAssetCollectionSubtype(pub i64);
+/// Wraps `PHAssetCollectionSubtype`.
+pub struct PHAssetCollectionSubtype(
+    /// Raw value for `PHAssetCollectionSubtype`.
+    pub i64,
+);
 
 impl PHAssetCollectionSubtype {
+    /// Constant on `PHAssetCollectionSubtype`.
     pub const ALBUM_REGULAR: Self = Self(2);
+    /// Constant on `PHAssetCollectionSubtype`.
     pub const ALBUM_SYNCED_EVENT: Self = Self(3);
+    /// Constant on `PHAssetCollectionSubtype`.
     pub const ALBUM_SYNCED_FACES: Self = Self(4);
+    /// Constant on `PHAssetCollectionSubtype`.
     pub const ALBUM_SYNCED_ALBUM: Self = Self(5);
+    /// Constant on `PHAssetCollectionSubtype`.
     pub const ALBUM_IMPORTED: Self = Self(6);
+    /// Constant on `PHAssetCollectionSubtype`.
     pub const ALBUM_MY_PHOTO_STREAM: Self = Self(100);
+    /// Constant on `PHAssetCollectionSubtype`.
     pub const ALBUM_CLOUD_SHARED: Self = Self(101);
+    /// Constant on `PHAssetCollectionSubtype`.
     pub const SMART_ALBUM_GENERIC: Self = Self(200);
+    /// Constant on `PHAssetCollectionSubtype`.
     pub const SMART_ALBUM_PANORAMAS: Self = Self(201);
+    /// Constant on `PHAssetCollectionSubtype`.
     pub const SMART_ALBUM_VIDEOS: Self = Self(202);
+    /// Constant on `PHAssetCollectionSubtype`.
     pub const SMART_ALBUM_FAVORITES: Self = Self(203);
+    /// Constant on `PHAssetCollectionSubtype`.
     pub const SMART_ALBUM_TIMELAPSES: Self = Self(204);
+    /// Constant on `PHAssetCollectionSubtype`.
     pub const SMART_ALBUM_ALL_HIDDEN: Self = Self(205);
+    /// Constant on `PHAssetCollectionSubtype`.
     pub const SMART_ALBUM_RECENTLY_ADDED: Self = Self(206);
+    /// Constant on `PHAssetCollectionSubtype`.
     pub const SMART_ALBUM_BURSTS: Self = Self(207);
+    /// Constant on `PHAssetCollectionSubtype`.
     pub const SMART_ALBUM_SLOMO_VIDEOS: Self = Self(208);
+    /// Constant on `PHAssetCollectionSubtype`.
     pub const SMART_ALBUM_USER_LIBRARY: Self = Self(209);
+    /// Constant on `PHAssetCollectionSubtype`.
     pub const SMART_ALBUM_SELF_PORTRAITS: Self = Self(210);
+    /// Constant on `PHAssetCollectionSubtype`.
     pub const SMART_ALBUM_SCREENSHOTS: Self = Self(211);
+    /// Constant on `PHAssetCollectionSubtype`.
     pub const SMART_ALBUM_DEPTH_EFFECT: Self = Self(212);
+    /// Constant on `PHAssetCollectionSubtype`.
     pub const SMART_ALBUM_LIVE_PHOTOS: Self = Self(213);
+    /// Constant on `PHAssetCollectionSubtype`.
     pub const SMART_ALBUM_ANIMATED: Self = Self(214);
+    /// Constant on `PHAssetCollectionSubtype`.
     pub const SMART_ALBUM_LONG_EXPOSURES: Self = Self(215);
+    /// Constant on `PHAssetCollectionSubtype`.
     pub const SMART_ALBUM_UNABLE_TO_UPLOAD: Self = Self(216);
+    /// Constant on `PHAssetCollectionSubtype`.
     pub const SMART_ALBUM_RAW: Self = Self(217);
+    /// Constant on `PHAssetCollectionSubtype`.
     pub const SMART_ALBUM_CINEMATIC: Self = Self(218);
+    /// Constant on `PHAssetCollectionSubtype`.
     pub const SMART_ALBUM_SPATIAL: Self = Self(219);
+    /// Constant on `PHAssetCollectionSubtype`.
     pub const SMART_ALBUM_SCREEN_RECORDINGS: Self = Self(220);
+    /// Constant on `PHAssetCollectionSubtype`.
     pub const ANY: Self = Self(i64::MAX);
 
+    /// Returns the raw Photos framework value for `PHAssetCollectionSubtype`.
     pub const fn raw_value(self) -> i64 {
         self.0
     }
@@ -97,27 +142,40 @@ impl From<PHAssetCollectionSubtype> for i64 {
 #[allow(clippy::unsafe_derive_deserialize)]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+/// Wraps `PHAssetCollection`.
 pub struct PHAssetCollection {
+    /// Corresponds to `PHAssetCollection.localIdentifier`.
     pub local_identifier: String,
+    /// Corresponds to `PHAssetCollection.localizedTitle`.
     pub localized_title: Option<String>,
+    /// Corresponds to `PHAssetCollection.collectionType`.
     pub collection_type: PHAssetCollectionType,
+    /// Corresponds to `PHAssetCollection.collectionSubtype`.
     pub collection_subtype: PHAssetCollectionSubtype,
+    /// Corresponds to `PHAssetCollection.estimatedAssetCount`.
     pub estimated_asset_count: Option<u64>,
     #[serde(default)]
+    /// Corresponds to `PHAssetCollection.startDate`.
     pub start_date: Option<String>,
     #[serde(default)]
+    /// Corresponds to `PHAssetCollection.endDate`.
     pub end_date: Option<String>,
     #[serde(default)]
+    /// Corresponds to `PHAssetCollection.approximateLocation`.
     pub approximate_location: Option<PHCoordinate>,
     #[serde(default)]
+    /// Corresponds to `PHAssetCollection.localizedLocationNames`.
     pub localized_location_names: Vec<String>,
     #[serde(default)]
+    /// Corresponds to `PHAssetCollection.canContainAssets`.
     pub can_contain_assets: bool,
     #[serde(default)]
+    /// Corresponds to `PHAssetCollection.canContainCollections`.
     pub can_contain_collections: bool,
 }
 
 impl PHAssetCollection {
+    /// Wraps a Photos framework fetch operation on `PHAssetCollection`.
     pub fn fetch(fetch_options: &PHFetchOptions) -> Result<PHFetchResult<Self>, PhotoKitError> {
         let options_json = json_cstring(fetch_options, "PHFetchOptions")?;
         let mut error = ptr::null_mut();
@@ -132,6 +190,7 @@ impl PHAssetCollection {
         }
     }
 
+    /// Wraps a Photos framework fetch operation on `PHAssetCollection`.
     pub fn fetch_with_type(
         collection_type: PHAssetCollectionType,
         collection_subtype: impl Into<PHAssetCollectionSubtype>,
@@ -162,6 +221,7 @@ impl PHAssetCollection {
         }
     }
 
+    /// Wraps a Photos framework fetch operation on `PHAssetCollection`.
     pub fn fetch_with_local_identifiers(
         identifiers: &[String],
         fetch_options: &PHFetchOptions,
@@ -190,6 +250,7 @@ impl PHAssetCollection {
         }
     }
 
+    /// Wraps a Photos framework fetch operation on `PHAssetCollection`.
     pub fn fetch_containing_asset(
         asset: &PHAsset,
         collection_type: PHAssetCollectionType,
@@ -223,6 +284,7 @@ impl PHAssetCollection {
         }
     }
 
+    /// Looks up `PHAssetCollection` from Photos framework identifiers.
     pub fn from_local_identifier(
         local_identifier: impl Into<String>,
     ) -> Result<Option<Self>, PhotoKitError> {
@@ -233,6 +295,7 @@ impl PHAssetCollection {
         Ok(result.into_vec().into_iter().next())
     }
 
+    /// Queries Photos framework state exposed by `PHAssetCollection`.
     pub fn can_perform_edit_operation(
         &self,
         edit_operation: PHCollectionEditOperation,
@@ -259,6 +322,7 @@ impl PHAssetCollection {
         }
     }
 
+    /// Wraps a Photos framework operation on `PHAssetCollection`.
     pub fn assets(
         &self,
         fetch_options: &PHFetchOptions,
@@ -266,6 +330,7 @@ impl PHAssetCollection {
         PHAsset::fetch_in_asset_collection(self, fetch_options)
     }
 
+    /// Wraps a Photos framework operation on `PHAssetCollection`.
     pub fn containing_collection_lists(
         &self,
         fetch_options: &PHFetchOptions,
