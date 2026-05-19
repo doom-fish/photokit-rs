@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.4.1] - 2026-05-19
+
+- Bump MSRV from 1.70 to 1.76 to match fleet baseline.
+
 ## 0.4.0 - 2026-05-19
 
 - Added PhotosUI / project-extension wrappers for `PHPickerConfiguration`, `PHPickerFilter`, `PHPickerResult`, `PHPickerViewController`, `PHPickerViewControllerDelegate`, `PHLivePhotoView`, `PHLivePhotoViewDelegate`, `PHContentEditingController`, `PHProjectInfo`, `PHProjectElement`, `PHProjectAssetElement`, `PHProjectRegionOfInterest`, `PHProjectSection`, `PHProjectSectionContent`, `PHProjectTextElement`, `PHProjectJournalEntryElement`, `PHProjectMapElement`, `PHProjectTypeDescription`, `PHProjectTypeDescriptionDataSource`, `PHProjectTypeDescriptionInvalidator`, `PHProjectExtensionContext`, and `PHProjectExtensionController`.
