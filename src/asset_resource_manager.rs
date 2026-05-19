@@ -19,6 +19,7 @@ pub struct PHAssetResourceRequestOptions {
 #[serde(rename_all = "camelCase")]
 /// Serialized result from `PHAssetResourceManager.requestData`.
 pub struct PHAssetResourceDataResult {
+    #[serde(alias = "requestID")]
     /// Corresponds to `PHAssetResourceDataResult.requestId`.
     pub request_id: i32,
     /// Corresponds to `PHAssetResourceDataResult.dataBase64`.

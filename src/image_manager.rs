@@ -210,7 +210,7 @@ pub struct PHImageResult {
     pub cancelled: bool,
     /// Corresponds to `PHImageResult.degraded`.
     pub degraded: bool,
-    #[serde(default)]
+    #[serde(default, alias = "requestID")]
     /// Corresponds to `PHImageResult.requestId`.
     pub request_id: Option<i32>,
     #[serde(default)]
@@ -248,7 +248,7 @@ pub struct PHImageDataResult {
     #[serde(default)]
     /// Corresponds to `PHImageDataResult.isInCloud`.
     pub is_in_cloud: bool,
-    #[serde(default)]
+    #[serde(default, alias = "requestID")]
     /// Corresponds to `PHImageDataResult.requestId`.
     pub request_id: Option<i32>,
     #[serde(default)]
@@ -271,7 +271,7 @@ impl PHImageDataResult {
 pub struct PHVideoResult {
     /// Corresponds to `PHVideoResult.resultType`.
     pub result_type: String,
-    #[serde(default)]
+    #[serde(default, alias = "requestID")]
     /// Corresponds to `PHVideoResult.requestId`.
     pub request_id: Option<i32>,
     #[serde(default)]

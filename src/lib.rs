@@ -42,6 +42,8 @@ pub mod collection;
 pub mod collection_list;
 /// Wraps `PHCollectionListChangeRequest` mutation APIs.
 pub mod collection_list_change_request;
+/// Wraps the `PHContentEditingController` protocol contract.
+pub mod content_editing_controller;
 /// Wraps `PHContentEditingInput` and related Photos framework editing-input types.
 pub mod content_editing_input;
 /// Wraps `PHContentEditingOutput` and related Photos framework editing-output types.
@@ -55,6 +57,8 @@ pub mod fetch_result;
 /// Wraps `PHFetchResultChangeDetails`.
 pub mod fetch_result_change_details;
 mod ffi;
+/// Shared geometry and color helper payloads used by PhotosUI wrappers.
+pub mod geometry;
 /// Wraps `PHImageManager` and `PHCachingImageManager`.
 pub mod image_manager;
 /// Re-exports Photos framework wrapper types.
@@ -63,17 +67,25 @@ pub mod library;
 pub mod live_photo;
 /// Wraps `PHLivePhotoEditingContext` and related frame-processing types.
 pub mod live_photo_editing_context;
+/// Wraps `PHLivePhotoView` and related PhotosUI playback callbacks.
+pub mod live_photo_view;
 /// Wraps `PHObject` and `PHObjectPlaceholder`.
 pub mod object;
 /// Wraps `PHObjectChangeDetails`.
 pub mod object_change_details;
 /// Wraps persistent change history Photos framework types.
 pub mod persistent_change;
+/// Wraps the `PHPicker` family in PhotosUI.
+pub mod picker;
 /// Wraps `PHPhotoLibrary` and observer registration APIs.
 pub mod photo_library;
 mod private;
 /// Wraps `PHProject` and `PHProjectChangeRequest`.
 pub mod project;
+/// Wraps PhotosUI project-extension context and type-description helpers.
+pub mod project_extension;
+/// Wraps PhotosUI `PHProjectInfo` and related immutable project-content types.
+pub mod project_info;
 /// Re-exports shared Photos framework wrapper types.
 pub mod types;
 
@@ -104,6 +116,9 @@ pub use collection_list::{PHCollectionList, PHCollectionListSubtype, PHCollectio
 pub use collection_list_change_request::{
     PHCollectionListChangeRequest, PHCollectionListChildMutation,
 };
+pub use content_editing_controller::{
+    PHContentEditingController, PHContentEditingPlaceholderImage,
+};
 pub use content_editing_input::{
     PHAdjustmentData, PHContentEditingInput, PHContentEditingInputInfo,
     PHContentEditingInputRequestOptions,
@@ -116,6 +131,7 @@ pub use error::{
 pub use fetch_options::{PHFetchOptions, PHSortDescriptor};
 pub use fetch_result::PHFetchResult;
 pub use fetch_result_change_details::{PHFetchResultChangeDetails, PHFetchResultMove};
+pub use geometry::{PHColor, PHRect};
 pub use image_manager::{
     PHCachingImageManager, PHImageContentMode, PHImageDataRequestHandle, PHImageDataResult,
     PHImageErrorKey, PHImageManager, PHImageManagerMaximumSize, PHImageRequest,
@@ -129,6 +145,11 @@ pub use live_photo_editing_context::{
     PHLivePhotoEditingContext, PHLivePhotoEditingContextInfo, PHLivePhotoEditingSaveResult,
     PHLivePhotoFrame, PHLivePhotoFrameProcessingDecision, PHLivePhotoFrameType,
 };
+pub use live_photo_view::{
+    PHLivePhotoView, PHLivePhotoViewContentMode, PHLivePhotoViewDelegate,
+    PHLivePhotoViewDelegateEvent, PHLivePhotoViewDelegateEventKind, PHLivePhotoViewInfo,
+    PHLivePhotoViewPlaybackStyle,
+};
 pub use object::{PHObject, PHObjectPlaceholder};
 pub use object_change_details::PHObjectChangeDetails;
 pub use persistent_change::{
@@ -139,7 +160,24 @@ pub use photo_library::{
     PHAccessLevel, PHAvailabilityObserver, PHChangeObserver, PHPhotoLibrary,
     PHPhotoLibraryAvailabilityChange, PHPhotoLibraryChange,
 };
+pub use picker::{
+    PHDirectionalRectEdge, PHItemProviderInfo, PHPickerCapabilities, PHPickerConfiguration,
+    PHPickerConfigurationAssetRepresentationMode, PHPickerConfigurationSelection,
+    PHPickerFilter, PHPickerMode, PHPickerResult, PHPickerUpdateConfiguration,
+    PHPickerViewController, PHPickerViewControllerDelegate,
+};
 pub use project::{PHProject, PHProjectChangeRequest};
+pub use project_extension::{
+    PHProjectExtensionContext, PHProjectExtensionController, PHProjectTypeDescription,
+    PHProjectTypeDescriptionDataSource, PHProjectTypeDescriptionInvalidator,
+};
+pub use project_info::{
+    PHProjectAssetElement, PHProjectCreationSource, PHProjectElement, PHProjectInfo,
+    PHProjectJournalEntryElement, PHProjectMapAnnotation, PHProjectMapElement,
+    PHProjectRegionOfInterest, PHProjectSection, PHProjectSectionContent,
+    PHProjectSectionElement, PHProjectSectionType, PHProjectTextElement,
+    PHProjectTextElementType,
+};
 
 /// Common imports.
 pub mod prelude {
@@ -175,6 +213,9 @@ pub mod prelude {
     pub use crate::collection_list_change_request::{
         PHCollectionListChangeRequest, PHCollectionListChildMutation,
     };
+    pub use crate::content_editing_controller::{
+        PHContentEditingController, PHContentEditingPlaceholderImage,
+    };
     pub use crate::content_editing_input::{
         PHAdjustmentData, PHContentEditingInput, PHContentEditingInputInfo,
         PHContentEditingInputRequestOptions,
@@ -187,6 +228,7 @@ pub mod prelude {
     pub use crate::fetch_options::{PHFetchOptions, PHSortDescriptor};
     pub use crate::fetch_result::PHFetchResult;
     pub use crate::fetch_result_change_details::{PHFetchResultChangeDetails, PHFetchResultMove};
+    pub use crate::geometry::{PHColor, PHRect};
     pub use crate::image_manager::{
         PHCachingImageManager, PHImageContentMode, PHImageDataRequestHandle, PHImageDataResult,
         PHImageErrorKey, PHImageManager, PHImageManagerMaximumSize, PHImageRequest,
@@ -200,6 +242,11 @@ pub mod prelude {
         PHLivePhotoEditingContext, PHLivePhotoEditingContextInfo, PHLivePhotoEditingSaveResult,
         PHLivePhotoFrame, PHLivePhotoFrameProcessingDecision, PHLivePhotoFrameType,
     };
+    pub use crate::live_photo_view::{
+        PHLivePhotoView, PHLivePhotoViewContentMode, PHLivePhotoViewDelegate,
+        PHLivePhotoViewDelegateEvent, PHLivePhotoViewDelegateEventKind, PHLivePhotoViewInfo,
+        PHLivePhotoViewPlaybackStyle,
+    };
     pub use crate::object::{PHObject, PHObjectPlaceholder};
     pub use crate::object_change_details::PHObjectChangeDetails;
     pub use crate::persistent_change::{
@@ -210,5 +257,22 @@ pub mod prelude {
         PHAccessLevel, PHAvailabilityObserver, PHChangeObserver, PHPhotoLibrary,
         PHPhotoLibraryAvailabilityChange, PHPhotoLibraryChange,
     };
+    pub use crate::picker::{
+        PHDirectionalRectEdge, PHItemProviderInfo, PHPickerCapabilities, PHPickerConfiguration,
+        PHPickerConfigurationAssetRepresentationMode, PHPickerConfigurationSelection,
+        PHPickerFilter, PHPickerMode, PHPickerResult, PHPickerUpdateConfiguration,
+        PHPickerViewController, PHPickerViewControllerDelegate,
+    };
     pub use crate::project::{PHProject, PHProjectChangeRequest};
+    pub use crate::project_extension::{
+        PHProjectExtensionContext, PHProjectExtensionController, PHProjectTypeDescription,
+        PHProjectTypeDescriptionDataSource, PHProjectTypeDescriptionInvalidator,
+    };
+    pub use crate::project_info::{
+        PHProjectAssetElement, PHProjectCreationSource, PHProjectElement, PHProjectInfo,
+        PHProjectJournalEntryElement, PHProjectMapAnnotation, PHProjectMapElement,
+        PHProjectRegionOfInterest, PHProjectSection, PHProjectSectionContent,
+        PHProjectSectionElement, PHProjectSectionType, PHProjectTextElement,
+        PHProjectTextElementType,
+    };
 }

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0 - 2026-05-19
+
+- Added PhotosUI / project-extension wrappers for `PHPickerConfiguration`, `PHPickerFilter`, `PHPickerResult`, `PHPickerViewController`, `PHPickerViewControllerDelegate`, `PHLivePhotoView`, `PHLivePhotoViewDelegate`, `PHContentEditingController`, `PHProjectInfo`, `PHProjectElement`, `PHProjectAssetElement`, `PHProjectRegionOfInterest`, `PHProjectSection`, `PHProjectSectionContent`, `PHProjectTextElement`, `PHProjectJournalEntryElement`, `PHProjectMapElement`, `PHProjectTypeDescription`, `PHProjectTypeDescriptionDataSource`, `PHProjectTypeDescriptionInvalidator`, `PHProjectExtensionContext`, and `PHProjectExtensionController`.
+- Added PhotosUI model/runtime smoke coverage plus a main-thread `17_photosui_runtime_smoke` example for the AppKit-backed picker and live-photo view wrappers.
+- Accepted both `requestId` and `requestID` when deserializing request-backed Swift bridge payloads.
+
 ## 0.3.4 - 2026-05-18
 
 - Added rustdoc coverage across the public API, including modules, types, variants, fields, and methods with Photos framework counterpart references.

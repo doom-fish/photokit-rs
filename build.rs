@@ -11,11 +11,13 @@ fn main() {
     }
 
     println!("cargo:rustc-link-lib=framework=Photos");
+    println!("cargo:rustc-link-lib=framework=PhotosUI");
     println!("cargo:rustc-link-lib=framework=Foundation");
     println!("cargo:rustc-link-lib=framework=AppKit");
     println!("cargo:rustc-link-lib=framework=AVFoundation");
     println!("cargo:rustc-link-lib=framework=CoreGraphics");
     println!("cargo:rustc-link-lib=framework=CoreLocation");
+    println!("cargo:rustc-link-lib=framework=MapKit");
     println!("cargo:rustc-link-lib=framework=UniformTypeIdentifiers");
 
     let swift_dir = "swift-bridge";

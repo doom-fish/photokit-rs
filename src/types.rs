@@ -27,6 +27,9 @@ pub use crate::collection_list::{PHCollectionList, PHCollectionListSubtype, PHCo
 pub use crate::collection_list_change_request::{
     PHCollectionListChangeRequest, PHCollectionListChildMutation,
 };
+pub use crate::content_editing_controller::{
+    PHContentEditingController, PHContentEditingPlaceholderImage,
+};
 pub use crate::content_editing_input::{
     PHAdjustmentData, PHContentEditingInput, PHContentEditingInputInfo,
     PHContentEditingInputRequestOptions,
@@ -39,6 +42,7 @@ pub use crate::error::{
 pub use crate::fetch_options::{PHFetchOptions, PHSortDescriptor};
 pub use crate::fetch_result::PHFetchResult;
 pub use crate::fetch_result_change_details::{PHFetchResultChangeDetails, PHFetchResultMove};
+pub use crate::geometry::{PHColor, PHRect};
 pub use crate::image_manager::{
     PHImageContentMode, PHImageDataResult, PHImageErrorKey, PHImageManagerMaximumSize,
     PHImageRequest, PHImageRequestOptionsDeliveryMode, PHImageRequestOptionsResizeMode,
@@ -51,6 +55,11 @@ pub use crate::live_photo_editing_context::{
     PHLivePhotoEditingContext, PHLivePhotoEditingContextInfo, PHLivePhotoEditingSaveResult,
     PHLivePhotoFrame, PHLivePhotoFrameProcessingDecision, PHLivePhotoFrameType,
 };
+pub use crate::live_photo_view::{
+    PHLivePhotoView, PHLivePhotoViewContentMode, PHLivePhotoViewDelegate,
+    PHLivePhotoViewDelegateEvent, PHLivePhotoViewDelegateEventKind, PHLivePhotoViewInfo,
+    PHLivePhotoViewPlaybackStyle,
+};
 pub use crate::object::{PHObject, PHObjectPlaceholder};
 pub use crate::object_change_details::PHObjectChangeDetails;
 pub use crate::persistent_change::{
@@ -60,4 +69,21 @@ pub use crate::persistent_change::{
 pub use crate::photo_library::{
     PHAccessLevel, PHPhotoLibraryAvailabilityChange, PHPhotoLibraryChange,
 };
+pub use crate::picker::{
+    PHDirectionalRectEdge, PHItemProviderInfo, PHPickerCapabilities, PHPickerConfiguration,
+    PHPickerConfigurationAssetRepresentationMode, PHPickerConfigurationSelection,
+    PHPickerFilter, PHPickerMode, PHPickerResult, PHPickerUpdateConfiguration,
+    PHPickerViewController, PHPickerViewControllerDelegate,
+};
 pub use crate::project::{PHProject, PHProjectChangeRequest};
+pub use crate::project_extension::{
+    PHProjectExtensionContext, PHProjectExtensionController, PHProjectTypeDescription,
+    PHProjectTypeDescriptionDataSource, PHProjectTypeDescriptionInvalidator,
+};
+pub use crate::project_info::{
+    PHProjectAssetElement, PHProjectCreationSource, PHProjectElement, PHProjectInfo,
+    PHProjectJournalEntryElement, PHProjectMapAnnotation, PHProjectMapElement,
+    PHProjectRegionOfInterest, PHProjectSection, PHProjectSectionContent,
+    PHProjectSectionElement, PHProjectSectionType, PHProjectTextElement,
+    PHProjectTextElementType,
+};

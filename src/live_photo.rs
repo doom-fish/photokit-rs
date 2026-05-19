@@ -39,7 +39,7 @@ pub struct PHLivePhotoResult {
     #[serde(default)]
     /// Serialized field carried by `PHLivePhotoResult`.
     pub size_height: f64,
-    #[serde(default)]
+    #[serde(default, alias = "requestID")]
     /// Serialized field carried by `PHLivePhotoResult`.
     pub request_id: Option<i32>,
     #[serde(default)]

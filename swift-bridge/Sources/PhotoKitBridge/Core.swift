@@ -41,6 +41,48 @@ public struct PKRErrorPayload: Codable {
     public var localIdentifiers: [String]
 }
 
+public struct PKRRectPayload: Codable {
+    public var x: Double
+    public var y: Double
+    public var width: Double
+    public var height: Double
+}
+
+public struct PKRColorPayload: Codable {
+    public var red: Double
+    public var green: Double
+    public var blue: Double
+    public var alpha: Double
+}
+
+public func pkrRectPayload(_ rect: CGRect) -> PKRRectPayload {
+    PKRRectPayload(
+        x: Double(rect.origin.x),
+        y: Double(rect.origin.y),
+        width: Double(rect.size.width),
+        height: Double(rect.size.height)
+    )
+}
+
+public func pkrRect(from payload: PKRRectPayload) -> CGRect {
+    CGRect(
+        x: payload.x,
+        y: payload.y,
+        width: payload.width,
+        height: payload.height
+    )
+}
+
+public func pkrColorPayload(_ color: NSColor?) -> PKRColorPayload? {
+    guard let color, let rgbColor = color.usingColorSpace(.deviceRGB) else { return nil }
+    return PKRColorPayload(
+        red: Double(rgbColor.redComponent),
+        green: Double(rgbColor.greenComponent),
+        blue: Double(rgbColor.blueComponent),
+        alpha: Double(rgbColor.alphaComponent)
+    )
+}
+
 private let pkrFractionalDateFormatter: ISO8601DateFormatter = {
     let formatter = ISO8601DateFormatter()
     formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
