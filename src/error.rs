@@ -199,3 +199,89 @@ impl PhotoKitError {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn authorization_status_maps_known_raw_values() {
+        let cases = [
+            (0, PHAuthorizationStatus::NotDetermined),
+            (1, PHAuthorizationStatus::Restricted),
+            (2, PHAuthorizationStatus::Denied),
+            (3, PHAuthorizationStatus::Authorized),
+            (4, PHAuthorizationStatus::Limited),
+        ];
+
+        for (raw, expected) in cases {
+            assert_eq!(PHAuthorizationStatus::from_raw(raw), expected);
+        }
+    }
+
+    #[test]
+    fn authorization_status_preserves_unknown_values() {
+        assert_eq!(
+            PHAuthorizationStatus::from_raw(42),
+            PHAuthorizationStatus::Unknown(42)
+        );
+    }
+
+    #[test]
+    fn authorization_status_reports_authorized_variants() {
+        assert!(PHAuthorizationStatus::Authorized.is_authorized());
+        assert!(PHAuthorizationStatus::Limited.is_authorized());
+        assert!(!PHAuthorizationStatus::Denied.is_authorized());
+    }
+
+    #[test]
+    fn photos_error_constants_expose_expected_raw_values() {
+        assert_eq!(PHPhotosError::USER_CANCELLED.raw_value(), 3_072);
+        assert_eq!(PHPhotosError::NETWORK_ERROR.raw_value(), 3_169);
+        assert_eq!(PHPhotosError::ACCESS_USER_DENIED.raw_value(), 3_311);
+    }
+
+    #[test]
+    fn ns_error_info_only_maps_photos_domain() {
+        let framework_error = NSErrorInfo {
+            domain: PHPhotosErrorDomain.into(),
+            code: PHPhotosError::NETWORK_ERROR.raw_value(),
+            message: "network unavailable".into(),
+            local_identifiers: vec!["A".into(), "B".into()],
+        };
+        let other_error = NSErrorInfo {
+            domain: "OtherDomain".into(),
+            code: 7,
+            message: "other".into(),
+            local_identifiers: Vec::new(),
+        };
+
+        assert_eq!(
+            framework_error.photos_error(),
+            Some(PHPhotosError::NETWORK_ERROR)
+        );
+        assert!(other_error.photos_error().is_none());
+        assert_eq!(
+            framework_error.to_string(),
+            "network unavailable (3169) [PHPhotosErrorDomain]"
+        );
+    }
+
+    #[test]
+    fn photokit_error_accessors_surface_wrapped_framework_error() {
+        let framework_error = NSErrorInfo {
+            domain: PHPhotosErrorDomain.into(),
+            code: PHPhotosError::LIMIT_EXCEEDED.raw_value(),
+            message: "too many items".into(),
+            local_identifiers: vec!["asset-1".into()],
+        };
+        let error = PhotoKitError::Framework(framework_error.clone());
+
+        assert_eq!(error.framework_error(), Some(&framework_error));
+        assert_eq!(error.photos_error(), Some(PHPhotosError::LIMIT_EXCEEDED));
+        assert_eq!(
+            error.to_string(),
+            "Photos.framework error: too many items (3307) [PHPhotosErrorDomain]"
+        );
+    }
+}

@@ -51,3 +51,57 @@ impl PHColor {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rect_new_sets_fields() {
+        assert_eq!(
+            PHRect::new(1.0, 2.0, 3.0, 4.0),
+            PHRect {
+                x: 1.0,
+                y: 2.0,
+                width: 3.0,
+                height: 4.0,
+            }
+        );
+    }
+
+    #[test]
+    fn rect_default_is_zeroed() {
+        assert_eq!(PHRect::default(), PHRect::new(0.0, 0.0, 0.0, 0.0));
+    }
+
+    #[test]
+    fn color_new_sets_fields() {
+        assert_eq!(
+            PHColor::new(0.25, 0.5, 0.75, 1.0),
+            PHColor {
+                red: 0.25,
+                green: 0.5,
+                blue: 0.75,
+                alpha: 1.0,
+            }
+        );
+    }
+
+    #[test]
+    fn rect_serde_round_trip_preserves_values() {
+        let rect = PHRect::new(10.0, 20.0, 30.0, 40.0);
+        let json = serde_json::to_string(&rect).expect("serialize rect");
+        let decoded: PHRect = serde_json::from_str(&json).expect("deserialize rect");
+
+        assert_eq!(decoded, rect);
+    }
+
+    #[test]
+    fn color_serde_round_trip_preserves_values() {
+        let color = PHColor::new(0.1, 0.2, 0.3, 0.4);
+        let json = serde_json::to_string(&color).expect("serialize color");
+        let decoded: PHColor = serde_json::from_str(&json).expect("deserialize color");
+
+        assert_eq!(decoded, color);
+    }
+}

@@ -112,3 +112,81 @@ impl PHFetchOptions {
         self
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::asset::PHAssetSourceType;
+
+    #[test]
+    fn sort_descriptor_new_sets_fields() {
+        let descriptor = PHSortDescriptor::new("creationDate", true);
+
+        assert_eq!(descriptor.key, "creationDate");
+        assert!(descriptor.ascending);
+    }
+
+    #[test]
+    fn default_fetch_options_match_expected_values() {
+        let options = PHFetchOptions::default();
+
+        assert!(options.predicate.is_none());
+        assert!(options.sort_descriptors.is_empty());
+        assert!(!options.include_hidden_assets);
+        assert!(!options.include_all_burst_assets);
+        assert!(options.include_asset_source_types.is_none());
+        assert!(options.fetch_limit.is_none());
+        assert!(options.wants_incremental_change_details);
+    }
+
+    #[test]
+    fn builder_sets_predicate_and_fetch_limit() {
+        let options = PHFetchOptions::default()
+            .with_predicate("mediaType == 1")
+            .with_fetch_limit(25);
+
+        assert_eq!(options.predicate.as_deref(), Some("mediaType == 1"));
+        assert_eq!(options.fetch_limit, Some(25));
+    }
+
+    #[test]
+    fn builder_appends_sort_descriptors_in_order() {
+        let options = PHFetchOptions::default()
+            .with_sort_descriptor(PHSortDescriptor::new("creationDate", true))
+            .with_sort_descriptor(PHSortDescriptor::new("modificationDate", false));
+
+        assert_eq!(
+            options.sort_descriptors,
+            vec![
+                PHSortDescriptor::new("creationDate", true),
+                PHSortDescriptor::new("modificationDate", false),
+            ]
+        );
+    }
+
+    #[test]
+    fn builder_sets_asset_source_types_and_visibility_flags() {
+        let source_types = PHAssetSourceType::USER_LIBRARY | PHAssetSourceType::CLOUD_SHARED;
+        let options = PHFetchOptions::default()
+            .with_include_hidden_assets(true)
+            .with_include_all_burst_assets(true)
+            .with_include_asset_source_types(source_types);
+
+        assert!(options.include_hidden_assets);
+        assert!(options.include_all_burst_assets);
+        assert_eq!(options.include_asset_source_types, Some(source_types));
+        assert!(
+            options
+                .include_asset_source_types
+                .expect("asset source types set")
+                .contains(PHAssetSourceType::USER_LIBRARY)
+        );
+    }
+
+    #[test]
+    fn builder_can_disable_incremental_change_details() {
+        let options = PHFetchOptions::default().with_wants_incremental_change_details(false);
+
+        assert!(!options.wants_incremental_change_details);
+    }
+}

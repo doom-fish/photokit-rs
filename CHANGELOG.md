@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.4.4] - 2026-05-20
+
+- Added in-`src/` unit tests across src/error.rs, src/fetch_options.rs, and src/geometry.rs (Tier 2 quality polish), providing fast `cargo test --lib` fail-fast signal alongside the existing integration tests under `tests/`.
+
 ## [0.4.3] - 2026-05-20
 
 - Clippy hygiene sweep: cleared all `-D warnings` lints across the crate. No public API change.
