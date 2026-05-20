@@ -19,6 +19,7 @@ pub mod asset_collection;
 pub mod asset_collection_change_request;
 pub mod asset_creation_request;
 pub mod asset_resource_manager;
+#[cfg(feature = "async")]
 pub mod async_ffi;
 pub mod change;
 pub mod cloud_identifier;
@@ -47,6 +48,7 @@ pub use asset_collection::*;
 pub use asset_collection_change_request::*;
 pub use asset_creation_request::*;
 pub use asset_resource_manager::*;
+#[cfg(feature = "async")]
 pub use async_ffi::*;
 pub use change::*;
 pub use cloud_identifier::*;

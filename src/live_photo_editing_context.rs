@@ -243,6 +243,7 @@ impl PHLivePhotoEditingContext {
         unsafe { ffi::ph_live_photo_editing_context_cancel(self.raw.as_ptr()) };
     }
 
+    #[cfg(feature = "async")]
     pub(crate) fn as_raw(&self) -> *mut c_void {
         self.raw.as_ptr()
     }

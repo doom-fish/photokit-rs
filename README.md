@@ -41,10 +41,11 @@ photokit = { version = "0.3", features = ["async"] }
 ```
 
 ```rust
+# #[cfg(feature = "async")]
+# async fn demo() -> Result<(), Box<dyn std::error::Error>> {
 use photokit::async_api::AsyncPHPhotoLibrary;
 use photokit::PHAccessLevel;
 
-# async fn demo() -> Result<(), Box<dyn std::error::Error>> {
 let status = AsyncPHPhotoLibrary::request_authorization(PHAccessLevel::ReadWrite).await?;
 # Ok(())
 # }
