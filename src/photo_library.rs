@@ -1,5 +1,6 @@
 use core::ffi::{c_char, c_void};
 use std::ptr::{self, NonNull};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use doom_fish_utils::panic_safe::catch_user_panic;
 use serde::{Deserialize, Serialize};
@@ -21,6 +22,78 @@ type AvailabilityCallback = dyn Fn(PHPhotoLibraryAvailabilityChange) + Send;
 enum ChangeCallbackKind {
     Summary(Box<SummaryChangeCallback>),
     Detailed(Box<DetailedChangeCallback>),
+}
+
+/// Reference-counted FFI context shared between the Rust observer token and the
+/// Swift bridge observer object.
+///
+/// The Swift observer takes a `+1` reference for its own lifetime (released in
+/// its `deinit`), so a `photoLibraryDidChange` / availability callback already
+/// dispatched on a background queue can never observe a freed callback box.
+/// The Rust observer holds the initial reference and releases it on drop; the
+/// box is only freed once both sides have released.
+struct RefCounted<T> {
+    value: T,
+    ref_count: AtomicUsize,
+}
+
+impl<T> RefCounted<T> {
+    fn into_raw(value: T) -> *mut Self {
+        Box::into_raw(Box::new(Self {
+            value,
+            ref_count: AtomicUsize::new(1),
+        }))
+    }
+
+    /// Increment the reference count.
+    ///
+    /// # Safety
+    /// `ptr` must point to a valid, live `RefCounted<T>`.
+    unsafe fn retain(ptr: *mut Self) {
+        (*ptr).ref_count.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Decrement the reference count, freeing the box if it reaches zero.
+    ///
+    /// # Safety
+    /// `ptr` must point to a valid, live `RefCounted<T>`. After this call,
+    /// `ptr` must not be used if the box was freed.
+    unsafe fn release(ptr: *mut Self) {
+        if ptr.is_null() {
+            return;
+        }
+        if (*ptr).ref_count.fetch_sub(1, Ordering::Release) == 1 {
+            // Acquire fence pairs with the Release stores from other threads'
+            // `fetch_sub` calls so the freeing thread observes all prior writes.
+            // This is the canonical Arc-style refcount drop; the fence is
+            // required for soundness on weakly-ordered architectures.
+            std::sync::atomic::fence(Ordering::Acquire);
+            drop(Box::from_raw(ptr));
+        }
+    }
+}
+
+// C trampolines handed to Swift so each bridge observer object can take a +1
+// reference on the Rust callback context for its own lifetime, then drop it in
+// `deinit`. `release` null-checks internally.
+extern "C" fn change_context_retain(user_info: *mut c_void) {
+    if !user_info.is_null() {
+        unsafe { RefCounted::<ChangeCallbackKind>::retain(user_info.cast()) };
+    }
+}
+
+extern "C" fn change_context_release(user_info: *mut c_void) {
+    unsafe { RefCounted::<ChangeCallbackKind>::release(user_info.cast()) };
+}
+
+extern "C" fn availability_context_retain(user_info: *mut c_void) {
+    if !user_info.is_null() {
+        unsafe { RefCounted::<Box<AvailabilityCallback>>::retain(user_info.cast()) };
+    }
+}
+
+extern "C" fn availability_context_release(user_info: *mut c_void) {
+    unsafe { RefCounted::<Box<AvailabilityCallback>>::release(user_info.cast()) };
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -166,12 +239,10 @@ impl PHPhotoLibrary {
     where
         F: Fn(PHPhotoLibraryAvailabilityChange) + Send + 'static,
     {
-        // SAFETY: `Box::into_raw` produces a valid, non-null pointer.
-        // The box is immediately wrapped in `NonNull::new_unchecked`, which is
-        // safe because `Box::into_raw` never returns null.
+        // SAFETY: `RefCounted::into_raw` produces a valid, non-null pointer.
         let user_info = unsafe {
             NonNull::new_unchecked(
-                Box::into_raw(Box::new(Box::new(callback) as Box<AvailabilityCallback>))
+                RefCounted::into_raw(Box::new(callback) as Box<AvailabilityCallback>)
                     .cast::<c_void>(),
             )
         };
@@ -184,18 +255,18 @@ impl PHPhotoLibrary {
                 self.raw.as_ptr(),
                 availability_observer_trampoline,
                 user_info.as_ptr(),
+                availability_context_retain,
+                availability_context_release,
                 &mut error,
             )
         };
         if let Some(raw) = NonNull::new(raw) {
             Ok(PHAvailabilityObserver { raw, user_info })
         } else {
-            // SAFETY: Registration failed; `user_info` was never handed to the
-            // Swift bridge so this is the only `from_raw` call on this pointer.
+            // SAFETY: Registration failed; the Swift bridge never took a
+            // reference, so this drops the initial `+1` from `into_raw`.
             unsafe {
-                drop(Box::from_raw(
-                    user_info.as_ptr().cast::<Box<AvailabilityCallback>>(),
-                ));
+                RefCounted::<Box<AvailabilityCallback>>::release(user_info.as_ptr().cast());
             }
             // SAFETY: `error` is a non-null pointer set by the Swift bridge on failure.
             Err(unsafe {
@@ -244,9 +315,9 @@ impl PHPhotoLibrary {
         &self,
         callback: ChangeCallbackKind,
     ) -> Result<PHChangeObserver, PhotoKitError> {
-        // SAFETY: `Box::into_raw` produces a valid, non-null pointer.
+        // SAFETY: `RefCounted::into_raw` produces a valid, non-null pointer.
         let user_info =
-            unsafe { NonNull::new_unchecked(Box::into_raw(Box::new(callback)).cast::<c_void>()) };
+            unsafe { NonNull::new_unchecked(RefCounted::into_raw(callback).cast::<c_void>()) };
         let mut error = ptr::null_mut();
         // SAFETY: `self.raw` is a valid PHPhotoLibrary pointer, the trampoline
         // is a valid `extern "C"` fn, and `user_info` is a live heap allocation
@@ -256,6 +327,8 @@ impl PHPhotoLibrary {
                 self.raw.as_ptr(),
                 change_observer_trampoline,
                 user_info.as_ptr(),
+                change_context_retain,
+                change_context_release,
                 &mut error,
             )
         };
@@ -263,12 +336,10 @@ impl PHPhotoLibrary {
         if let Some(raw) = NonNull::new(raw) {
             Ok(PHChangeObserver { raw, user_info })
         } else {
-            // SAFETY: Registration failed; `user_info` was never handed to the
-            // Swift bridge so this is the only `from_raw` call on this pointer.
+            // SAFETY: Registration failed; the Swift bridge never took a
+            // reference, so this drops the initial `+1` from `into_raw`.
             unsafe {
-                drop(Box::from_raw(
-                    user_info.as_ptr().cast::<ChangeCallbackKind>(),
-                ));
+                RefCounted::<ChangeCallbackKind>::release(user_info.as_ptr().cast());
             }
             // SAFETY: `error` is a non-null pointer set by the Swift bridge on failure.
             Err(unsafe { PhotoKitError::from_error_ptr(error, "registerChangeObserver failed") })
@@ -297,15 +368,14 @@ impl core::fmt::Debug for PHChangeObserver {
 impl Drop for PHChangeObserver {
     fn drop(&mut self) {
         // SAFETY: `self.raw` is a valid observer handle registered with the
-        // Swift bridge; unregister before freeing the callback storage below.
+        // Swift bridge; unregister before dropping our reference below.
         unsafe { ffi::ph_photo_library_unregister_change_observer(self.raw.as_ptr()) };
-        // SAFETY: `self.user_info` was created from a `Box<ChangeCallbackKind>`
-        // via `Box::into_raw` and this is the only `from_raw` call on it (the
-        // Swift bridge never calls `from_raw`; the trampoline only borrows it).
+        // SAFETY: `self.user_info` is a `RefCounted<ChangeCallbackKind>` created
+        // via `into_raw`. This drops the initial `+1`; the Swift observer holds
+        // its own reference (taken via `change_context_retain`) which it releases
+        // in `deinit`, so an in-flight callback can never observe a freed box.
         unsafe {
-            drop(Box::from_raw(
-                self.user_info.as_ptr().cast::<ChangeCallbackKind>(),
-            ));
+            RefCounted::<ChangeCallbackKind>::release(self.user_info.as_ptr().cast());
         }
     }
 }
@@ -326,25 +396,25 @@ impl core::fmt::Debug for PHAvailabilityObserver {
 impl Drop for PHAvailabilityObserver {
     fn drop(&mut self) {
         // SAFETY: `self.raw` is a valid observer handle; unregister first so
-        // the Swift bridge can no longer call the trampoline before we free
-        // the callback storage below.
+        // the Swift bridge can no longer call the trampoline before we drop
+        // our reference below.
         unsafe { ffi::ph_photo_library_unregister_availability_observer(self.raw.as_ptr()) };
-        // SAFETY: `self.user_info` was created from `Box<Box<AvailabilityCallback>>`
-        // via `Box::into_raw` and this is the only `from_raw` call on it.
+        // SAFETY: `self.user_info` is a `RefCounted<Box<AvailabilityCallback>>`
+        // created via `into_raw`. This drops the initial `+1`; the Swift observer
+        // releases its own reference in `deinit`, so an in-flight callback can
+        // never observe a freed box.
         unsafe {
-            drop(Box::from_raw(
-                self.user_info.as_ptr().cast::<Box<AvailabilityCallback>>(),
-            ));
+            RefCounted::<Box<AvailabilityCallback>>::release(self.user_info.as_ptr().cast());
         }
     }
 }
 
 unsafe extern "C" fn change_observer_trampoline(change: *mut c_void, user_info: *mut c_void) {
-    // SAFETY: `user_info` is a `Box<ChangeCallbackKind>` kept alive by the
-    // `PHChangeObserver` that owns this callback registration.  The trampoline
-    // only borrows it; the box is freed in `PHChangeObserver::drop` after
-    // `ph_photo_library_unregister_change_observer` returns.
-    let callback = &*(user_info.cast::<ChangeCallbackKind>());
+    // SAFETY: `user_info` is a `RefCounted<ChangeCallbackKind>` kept alive by
+    // both the `PHChangeObserver` token and the Swift observer object (which
+    // holds a `+1` for the duration of any in-flight callback). The trampoline
+    // only borrows the inner callback.
+    let callback = &(*(user_info.cast::<RefCounted<ChangeCallbackKind>>())).value;
     match callback {
         ChangeCallbackKind::Summary(callback) => {
             if let Some(change) = NonNull::new(change) {
@@ -378,9 +448,10 @@ unsafe extern "C" fn availability_observer_trampoline(
         return;
     }
 
-    // SAFETY: `user_info` is a `Box<Box<AvailabilityCallback>>` kept alive by
-    // the `PHAvailabilityObserver` that owns this registration.
-    let callback = &mut **user_info.cast::<Box<AvailabilityCallback>>();
+    // SAFETY: `user_info` is a `RefCounted<Box<AvailabilityCallback>>` kept
+    // alive by both the `PHAvailabilityObserver` token and the Swift observer
+    // object (which holds a `+1` for the duration of any in-flight callback).
+    let callback = &mut (*(user_info.cast::<RefCounted<Box<AvailabilityCallback>>>())).value;
     let payload = if payload_json.is_null() {
         PHPhotoLibraryAvailabilityChange::default()
     } else if let Some(json) = take_string(payload_json) {

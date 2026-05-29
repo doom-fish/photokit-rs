@@ -1,6 +1,6 @@
 use core::ffi::{c_char, c_void};
 
-use super::{ChangeObserverCallback, JsonCallback};
+use super::{ChangeObserverCallback, JsonCallback, ObserverContextCallback};
 
 extern "C" {
     pub fn ph_authorization_status() -> i32;
@@ -19,6 +19,8 @@ extern "C" {
         library: *mut c_void,
         callback: ChangeObserverCallback,
         user_info: *mut c_void,
+        context_retain: ObserverContextCallback,
+        context_release: ObserverContextCallback,
         out_error: *mut *mut c_char,
     ) -> *mut c_void;
     pub fn ph_photo_library_unregister_change_observer(observer: *mut c_void);
@@ -26,6 +28,8 @@ extern "C" {
         library: *mut c_void,
         callback: JsonCallback,
         user_info: *mut c_void,
+        context_retain: ObserverContextCallback,
+        context_release: ObserverContextCallback,
         out_error: *mut *mut c_char,
     ) -> *mut c_void;
     pub fn ph_photo_library_unregister_availability_observer(observer: *mut c_void);

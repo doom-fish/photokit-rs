@@ -9,6 +9,7 @@ extern "C" {
 }
 
 pub type ChangeObserverCallback = unsafe extern "C" fn(change: *mut c_void, user_info: *mut c_void);
+pub type ObserverContextCallback = extern "C" fn(user_info: *mut c_void);
 pub type LivePhotoFrameProcessorCallback =
     unsafe extern "C" fn(frame_json: *const c_char, user_info: *mut c_void) -> i32;
 pub type BoolJsonCallback = unsafe extern "C" fn(json: *mut c_char, user_info: *mut c_void) -> i32;

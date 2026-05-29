@@ -14,20 +14,38 @@ public typealias PKRChangeObserverCallback = @convention(c) (UnsafeMutableRawPoi
 
 public typealias PKRAvailabilityObserverCallback = @convention(c) (UnsafeMutablePointer<CChar>?, UnsafeMutableRawPointer?) -> Void
 
+public typealias PKRObserverContextCallback = @convention(c) (UnsafeMutableRawPointer) -> Void
+
 final class PKRAvailabilityObserverBox: NSObject, PHPhotoLibraryAvailabilityObserver {
     let library: PHPhotoLibrary
     let callback: PKRAvailabilityObserverCallback
     let userInfo: UnsafeMutableRawPointer?
+    let contextRelease: PKRObserverContextCallback?
 
     init(
         library: PHPhotoLibrary,
         callback: @escaping PKRAvailabilityObserverCallback,
-        userInfo: UnsafeMutableRawPointer?
+        userInfo: UnsafeMutableRawPointer?,
+        contextRetain: PKRObserverContextCallback?,
+        contextRelease: PKRObserverContextCallback?
     ) {
         self.library = library
         self.callback = callback
         self.userInfo = userInfo
+        self.contextRelease = contextRelease
         super.init()
+        // Take a +1 on the Rust callback context for the lifetime of this object
+        // so an in-flight availability callback on a background queue can never
+        // observe a freed box.
+        if let userInfo {
+            contextRetain?(userInfo)
+        }
+    }
+
+    deinit {
+        if let userInfo {
+            contextRelease?(userInfo)
+        }
     }
 
     func photoLibraryDidBecomeUnavailable(_ photoLibrary: PHPhotoLibrary) {
@@ -96,16 +114,32 @@ final class PKRChangeObserverBox: NSObject, PHPhotoLibraryChangeObserver {
     let library: PHPhotoLibrary
     let callback: PKRChangeObserverCallback
     let userInfo: UnsafeMutableRawPointer?
+    let contextRelease: PKRObserverContextCallback?
 
     init(
         library: PHPhotoLibrary,
         callback: @escaping PKRChangeObserverCallback,
-        userInfo: UnsafeMutableRawPointer?
+        userInfo: UnsafeMutableRawPointer?,
+        contextRetain: PKRObserverContextCallback?,
+        contextRelease: PKRObserverContextCallback?
     ) {
         self.library = library
         self.callback = callback
         self.userInfo = userInfo
+        self.contextRelease = contextRelease
         super.init()
+        // Take a +1 on the Rust callback context for the lifetime of this object
+        // so an in-flight photoLibraryDidChange callback on a background queue
+        // can never observe a freed box.
+        if let userInfo {
+            contextRetain?(userInfo)
+        }
+    }
+
+    deinit {
+        if let userInfo {
+            contextRelease?(userInfo)
+        }
     }
 
     func photoLibraryDidChange(_ changeInstance: PHChange) {
@@ -219,6 +253,8 @@ public func ph_photo_library_register_change_observer(
     _ library: UnsafeMutableRawPointer?,
     _ callback: @escaping PKRChangeObserverCallback,
     _ userInfo: UnsafeMutableRawPointer?,
+    _ contextRetain: @escaping PKRObserverContextCallback,
+    _ contextRelease: @escaping PKRObserverContextCallback,
     _ outError: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> UnsafeMutableRawPointer? {
     guard let library else {
@@ -230,7 +266,9 @@ public func ph_photo_library_register_change_observer(
     let observer = PKRChangeObserverBox(
         library: photoLibrary,
         callback: callback,
-        userInfo: userInfo
+        userInfo: userInfo,
+        contextRetain: contextRetain,
+        contextRelease: contextRelease
     )
     photoLibrary.register(observer)
     return pkrRetain(observer)
@@ -268,6 +306,8 @@ public func ph_photo_library_register_availability_observer(
     _ library: UnsafeMutableRawPointer?,
     _ callback: @escaping PKRAvailabilityObserverCallback,
     _ userInfo: UnsafeMutableRawPointer?,
+    _ contextRetain: @escaping PKRObserverContextCallback,
+    _ contextRelease: @escaping PKRObserverContextCallback,
     _ outError: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> UnsafeMutableRawPointer? {
     guard let library else {
@@ -279,7 +319,9 @@ public func ph_photo_library_register_availability_observer(
     let observer = PKRAvailabilityObserverBox(
         library: photoLibrary,
         callback: callback,
-        userInfo: userInfo
+        userInfo: userInfo,
+        contextRetain: contextRetain,
+        contextRelease: contextRelease
     )
     photoLibrary.register(observer)
     return pkrRetain(observer)

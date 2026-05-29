@@ -15,7 +15,6 @@ let package = Package(
     targets: [
         .target(
             name: "PhotoKitBridge",
-            path: "Sources/PhotoKitBridge",
-            publicHeadersPath: "include")
+            path: "Sources/PhotoKitBridge")
     ]
 )
