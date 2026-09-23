@@ -63,7 +63,7 @@ public func ph_project_fetch_top_level_json(
 ) -> UnsafeMutablePointer<CChar>? {
     do {
         let payload = try pkrDecodeJSON(fetchOptionsJSON, as: PKRFetchOptionsPayload.self)
-        let result = PHCollection.fetchTopLevelUserCollections(with: pkrBuildFetchOptions(payload))
+        let result = try pkrCheckedFetchResult(PHCollection.fetchTopLevelUserCollections(with: pkrBuildFetchOptions(payload, for: .collection)))
         var projects: [PKRProjectPayload] = []
         result.enumerateObjects { collection, _, _ in
             if let project = collection as? PHProject {

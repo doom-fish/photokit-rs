@@ -100,7 +100,7 @@ public func ph_collection_list_fetch_containing_collection_json(
         let payload = try pkrDecodeJSON(fetchOptionsJSON, as: PKRFetchOptionsPayload.self)
         let result = PHCollectionList.fetchCollectionListsContaining(
             collection,
-            options: pkrBuildFetchOptions(payload)
+            options: try pkrBuildFetchOptions(payload, for: .collectionList)
         )
         return pkrCString(try pkrEncodeJSON(pkrCollectFetchResult(result, transform: pkrEncodeCollectionList)))
     } catch {
@@ -120,7 +120,7 @@ public func ph_collection_list_fetch_with_local_identifiers_json(
         let payload = try pkrDecodeJSON(fetchOptionsJSON, as: PKRFetchOptionsPayload.self)
         let result = PHCollectionList.fetchCollectionLists(
             withLocalIdentifiers: identifiers,
-            options: pkrBuildFetchOptions(payload)
+            options: try pkrBuildFetchOptions(payload, for: .collectionList)
         )
         return pkrCString(try pkrEncodeJSON(pkrCollectFetchResult(result, transform: pkrEncodeCollectionList)))
     } catch {
@@ -141,7 +141,7 @@ public func ph_collection_list_fetch_with_type_json(
         let result = PHCollectionList.fetchCollectionLists(
             with: try pkrCollectionListType(rawValue: collectionListTypeRawValue),
             subtype: PHCollectionListSubtype(rawValue: Int(collectionListSubtypeRawValue)) ?? .any,
-            options: pkrBuildFetchOptions(payload)
+            options: try pkrBuildFetchOptions(payload, for: .collectionList)
         )
         return pkrCString(try pkrEncodeJSON(pkrCollectFetchResult(result, transform: pkrEncodeCollectionList)))
     } catch {

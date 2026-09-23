@@ -43,7 +43,7 @@ public func ph_collection_fetch_in_collection_list_json(
     do {
         let list = try pkrRequestCollectionList(localIdentifier: String(cString: collectionListIdentifier))
         let payload = try pkrDecodeJSON(fetchOptionsJSON, as: PKRFetchOptionsPayload.self)
-        let result = PHCollection.fetchCollections(in: list, options: pkrBuildFetchOptions(payload))
+        let result = PHCollection.fetchCollections(in: list, options: try pkrBuildFetchOptions(payload, for: .collection))
         return pkrCString(try pkrEncodeJSON(pkrCollectFetchResult(result, transform: pkrEncodeCollection)))
     } catch {
         pkrSetError(outError, error)
@@ -58,7 +58,7 @@ public func ph_collection_fetch_top_level_user_collections_json(
 ) -> UnsafeMutablePointer<CChar>? {
     do {
         let payload = try pkrDecodeJSON(fetchOptionsJSON, as: PKRFetchOptionsPayload.self)
-        let result = PHCollection.fetchTopLevelUserCollections(with: pkrBuildFetchOptions(payload))
+        let result = PHCollection.fetchTopLevelUserCollections(with: try pkrBuildFetchOptions(payload, for: .collection))
         return pkrCString(try pkrEncodeJSON(pkrCollectFetchResult(result, transform: pkrEncodeCollection)))
     } catch {
         pkrSetError(outError, error)

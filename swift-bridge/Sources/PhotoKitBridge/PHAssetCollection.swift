@@ -93,12 +93,12 @@ public func ph_asset_collection_fetch_all_json(
 ) -> UnsafeMutablePointer<CChar>? {
     do {
         let payload = try pkrDecodeJSON(fetchOptionsJSON, as: PKRFetchOptionsPayload.self)
-        let options = pkrBuildFetchOptions(payload)
-        var collections = pkrCollectFetchResult(
+        let options = try pkrBuildFetchOptions(payload, for: .assetCollection)
+        var collections = try pkrCollectFetchResult(
             PHAssetCollection.fetchAssetCollections(with: .album, subtype: .any, options: options),
             transform: pkrEncodeCollection
         )
-        collections += pkrCollectFetchResult(
+        collections += try pkrCollectFetchResult(
             PHAssetCollection.fetchAssetCollections(with: .smartAlbum, subtype: .any, options: options),
             transform: pkrEncodeCollection
         )
@@ -121,7 +121,7 @@ public func ph_asset_collection_fetch_with_type_json(
         let result = PHAssetCollection.fetchAssetCollections(
             with: try pkrAssetCollectionType(rawValue: collectionTypeRawValue),
             subtype: PHAssetCollectionSubtype(rawValue: Int(collectionSubtypeRawValue)) ?? .any,
-            options: pkrBuildFetchOptions(payload)
+            options: try pkrBuildFetchOptions(payload, for: .assetCollection)
         )
         return pkrCString(try pkrEncodeJSON(pkrCollectFetchResult(result, transform: pkrEncodeCollection)))
     } catch {
@@ -141,7 +141,7 @@ public func ph_asset_collection_fetch_with_local_identifiers_json(
         let payload = try pkrDecodeJSON(fetchOptionsJSON, as: PKRFetchOptionsPayload.self)
         let result = PHAssetCollection.fetchAssetCollections(
             withLocalIdentifiers: identifiers,
-            options: pkrBuildFetchOptions(payload)
+            options: try pkrBuildFetchOptions(payload, for: .assetCollection)
         )
         return pkrCString(try pkrEncodeJSON(pkrCollectFetchResult(result, transform: pkrEncodeCollection)))
     } catch {
@@ -168,7 +168,7 @@ public func ph_asset_collection_fetch_containing_asset_json(
         let result = PHAssetCollection.fetchAssetCollectionsContaining(
             asset,
             with: try pkrAssetCollectionType(rawValue: collectionTypeRawValue),
-            options: pkrBuildFetchOptions(payload)
+            options: try pkrBuildFetchOptions(payload, for: .assetCollection)
         )
         return pkrCString(try pkrEncodeJSON(pkrCollectFetchResult(result, transform: pkrEncodeCollection)))
     } catch {

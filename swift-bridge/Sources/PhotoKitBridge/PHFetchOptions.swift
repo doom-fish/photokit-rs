@@ -1,5 +1,6 @@
 import Foundation
 import Photos
+import PhotoKitObjCBridge
 
 struct PKRSortDescriptorPayload: Codable {
     var key: String
@@ -16,10 +17,14 @@ struct PKRFetchOptionsPayload: Codable {
     var wantsIncrementalChangeDetails: Bool
 }
 
-func pkrBuildFetchOptions(_ payload: PKRFetchOptionsPayload) -> PHFetchOptions {
+func pkrBuildFetchOptions(_ payload: PKRFetchOptionsPayload, for entity: PKRFetchEntity) throws -> PHFetchOptions {
     let options = PHFetchOptions()
     if let predicate = payload.predicate, !predicate.isEmpty {
-        options.predicate = NSPredicate(format: predicate)
+        var error: NSError?
+        guard let parsed = PKRPredicateWithFormat(predicate, &error) else {
+            throw error ?? pkrError("invalid fetch predicate: \(predicate)")
+        }
+        options.predicate = parsed
     }
     if !payload.sortDescriptors.isEmpty {
         options.sortDescriptors = payload.sortDescriptors.map {
@@ -37,5 +42,11 @@ func pkrBuildFetchOptions(_ payload: PKRFetchOptionsPayload) -> PHFetchOptions {
         options.fetchLimit = fetchLimit
     }
     options.wantsIncrementalChangeDetails = payload.wantsIncrementalChangeDetails
+    if options.predicate != nil || !payload.sortDescriptors.isEmpty {
+        var error: NSError?
+        guard PKRValidateFetchOptions(options, entity, &error) else {
+            throw error ?? pkrError("unsupported fetch options")
+        }
+    }
     return options
 }

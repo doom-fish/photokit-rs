@@ -258,7 +258,7 @@ public func ph_asset_fetch_all_json(
 ) -> UnsafeMutablePointer<CChar>? {
     do {
         let payload = try pkrDecodeJSON(fetchOptionsJSON, as: PKRFetchOptionsPayload.self)
-        let result = PHAsset.fetchAssets(with: pkrBuildFetchOptions(payload))
+        let result = PHAsset.fetchAssets(with: try pkrBuildFetchOptions(payload, for: .asset))
         return pkrCString(try pkrEncodeJSON(pkrCollectFetchResult(result, transform: pkrEncodeAsset)))
     } catch {
         pkrSetError(outError, error)
@@ -276,7 +276,7 @@ public func ph_asset_fetch_with_media_type_json(
         let payload = try pkrDecodeJSON(fetchOptionsJSON, as: PKRFetchOptionsPayload.self)
         let result = PHAsset.fetchAssets(
             with: try pkrAssetMediaType(rawValue: mediaType),
-            options: pkrBuildFetchOptions(payload)
+            options: try pkrBuildFetchOptions(payload, for: .asset)
         )
         return pkrCString(try pkrEncodeJSON(pkrCollectFetchResult(result, transform: pkrEncodeAsset)))
     } catch {
@@ -296,7 +296,7 @@ public func ph_asset_fetch_with_local_identifiers_json(
         let payload = try pkrDecodeJSON(fetchOptionsJSON, as: PKRFetchOptionsPayload.self)
         let result = PHAsset.fetchAssets(
             withLocalIdentifiers: identifiers,
-            options: pkrBuildFetchOptions(payload)
+            options: try pkrBuildFetchOptions(payload, for: .asset)
         )
         return pkrCString(try pkrEncodeJSON(pkrCollectFetchResult(result, transform: pkrEncodeAsset)))
     } catch {
@@ -319,7 +319,7 @@ public func ph_asset_fetch_in_collection_json(
     do {
         let collection = try pkrRequestAssetCollection(localIdentifier: String(cString: collectionIdentifier))
         let payload = try pkrDecodeJSON(fetchOptionsJSON, as: PKRFetchOptionsPayload.self)
-        let result = PHAsset.fetchAssets(in: collection, options: pkrBuildFetchOptions(payload))
+        let result = PHAsset.fetchAssets(in: collection, options: try pkrBuildFetchOptions(payload, for: .asset))
         return pkrCString(try pkrEncodeJSON(pkrCollectFetchResult(result, transform: pkrEncodeAsset)))
     } catch {
         pkrSetError(outError, error)
@@ -341,8 +341,8 @@ public func ph_asset_fetch_key_assets_in_collection_json(
     do {
         let collection = try pkrRequestAssetCollection(localIdentifier: String(cString: collectionIdentifier))
         let payload = try pkrDecodeJSON(fetchOptionsJSON, as: PKRFetchOptionsPayload.self)
-        let result = PHAsset.fetchKeyAssets(in: collection, options: pkrBuildFetchOptions(payload))
-        let assets = result.map { pkrCollectFetchResult($0, transform: pkrEncodeAsset) } ?? []
+        let result = PHAsset.fetchKeyAssets(in: collection, options: try pkrBuildFetchOptions(payload, for: .asset))
+        let assets = try result.map { try pkrCollectFetchResult($0, transform: pkrEncodeAsset) } ?? []
         return pkrCString(try pkrEncodeJSON(assets))
     } catch {
         pkrSetError(outError, error)
