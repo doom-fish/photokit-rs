@@ -35,11 +35,37 @@ func pkrAssetResourceCreationOptions(
     return options
 }
 
-func pkrAssetCreationURL(_ value: String) -> URL {
-    if value.hasPrefix("file://") {
-        return URL(string: value) ?? URL(fileURLWithPath: value)
+enum PKRAssetCreationSource {
+    case file(URL)
+    case data(Data)
+}
+
+struct PKRResolvedAssetCreationResource {
+    var type: PHAssetResourceType
+    var source: PKRAssetCreationSource
+    var options: PHAssetResourceCreationOptions?
+}
+
+func pkrResolveAssetCreationResource(_ resource: PKRAssetCreationResourcePayload) throws -> PKRResolvedAssetCreationResource {
+    guard let type = PHAssetResourceType(rawValue: resource.resourceType) else {
+        throw pkrError("unknown asset resource type: \(resource.resourceType)")
     }
-    return URL(fileURLWithPath: value)
+    let source: PKRAssetCreationSource
+    if let fileURL = resource.fileURL {
+        source = .file(try pkrReadableFileURL(fileURL))
+    } else if let dataBase64 = resource.dataBase64 {
+        guard let data = Data(base64Encoded: dataBase64) else {
+            throw pkrError("asset resource data is not valid base64")
+        }
+        source = .data(data)
+    } else {
+        throw pkrError("asset resource needs a file URL or data")
+    }
+    return PKRResolvedAssetCreationResource(
+        type: type,
+        source: source,
+        options: pkrAssetResourceCreationOptions(from: resource.options)
+    )
 }
 
 @_cdecl("ph_asset_creation_request_supports_resource_types")
@@ -71,24 +97,20 @@ public func ph_asset_creation_request_perform(
             )
         }
 
+        guard PHAssetCreationRequest.supportsAssetResourceTypes(resources.map { NSNumber(value: $0.resourceType) }) else {
+            throw pkrError("unsupported combination of asset resource types: \(resources.map(\.resourceType))")
+        }
+        let resolved = try resources.map(pkrResolveAssetCreationResource)
+
         var localIdentifier: String?
         try PHPhotoLibrary.shared().performChangesAndWait {
             let request = PHAssetCreationRequest.forAsset()
-            for resource in resources {
-                let resourceType = PHAssetResourceType(rawValue: resource.resourceType) ?? .photo
-                if let fileURL = resource.fileURL {
-                    request.addResource(
-                        with: resourceType,
-                        fileURL: pkrAssetCreationURL(fileURL),
-                        options: pkrAssetResourceCreationOptions(from: resource.options)
-                    )
-                } else if let dataBase64 = resource.dataBase64,
-                          let data = Data(base64Encoded: dataBase64) {
-                    request.addResource(
-                        with: resourceType,
-                        data: data,
-                        options: pkrAssetResourceCreationOptions(from: resource.options)
-                    )
+            for resource in resolved {
+                switch resource.source {
+                case .file(let url):
+                    request.addResource(with: resource.type, fileURL: url, options: resource.options)
+                case .data(let data):
+                    request.addResource(with: resource.type, data: data, options: resource.options)
                 }
             }
             localIdentifier = request.placeholderForCreatedAsset?.localIdentifier

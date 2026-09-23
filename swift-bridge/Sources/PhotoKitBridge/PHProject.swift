@@ -27,7 +27,7 @@ struct PKRProjectChangeRequestPayload: Codable {
 }
 
 func pkrEncodeProject(_ project: PHProject) -> PKRProjectPayload {
-    let estimatedAssetCount: UInt64? = project.estimatedAssetCount == NSNotFound ? nil : UInt64(project.estimatedAssetCount)
+    let estimatedAssetCount: UInt64? = project.estimatedAssetCount == NSNotFound ? nil : UInt64(exactly: project.estimatedAssetCount)
     return PKRProjectPayload(
         localIdentifier: project.localIdentifier,
         localizedTitle: project.localizedTitle,
@@ -108,22 +108,33 @@ public func ph_project_change_request_perform_json(
     do {
         let payload = try pkrDecodeJSON(payloadJSON, as: PKRProjectChangeRequestPayload.self)
         let project = try pkrRequestProject(localIdentifier: payload.projectLocalIdentifier)
+        let extensionData = try payload.projectExtensionDataBase64.map { dataBase64 -> Data in
+            guard let data = Data(base64Encoded: dataBase64) else {
+                throw pkrError("project extension data is not valid base64")
+            }
+            return data
+        }
+        let previewImage = try payload.projectPreviewImageFileURL.map { previewURL -> NSImage in
+            let url = try pkrReadableFileURL(previewURL)
+            guard let image = NSImage(contentsOf: url) else {
+                throw pkrError("project preview image is not a decodable image: \(url.path)")
+            }
+            return image
+        }
+        let assetsToRemove = try payload.removeAssetIdentifiers.map(pkrRequestAsset)
         try PHPhotoLibrary.shared().performChangesAndWait {
             let request = PHProjectChangeRequest(project: project)
             if let title = payload.title {
                 request.title = title
             }
-            if let dataBase64 = payload.projectExtensionDataBase64,
-               let data = Data(base64Encoded: dataBase64) {
-                request.projectExtensionData = data
+            if let extensionData {
+                request.projectExtensionData = extensionData
             }
-            if let previewURL = payload.projectPreviewImageFileURL,
-               let image = NSImage(contentsOf: pkrAssetCreationURL(previewURL)) {
-                request.setProjectPreviewImage(image)
+            if let previewImage {
+                request.setProjectPreviewImage(previewImage)
             }
-            if !payload.removeAssetIdentifiers.isEmpty {
-                let assets = try! payload.removeAssetIdentifiers.map(pkrRequestAsset)
-                request.removeAssets(assets)
+            if !assetsToRemove.isEmpty {
+                request.removeAssets(assetsToRemove)
             }
         }
         return PKR_OK

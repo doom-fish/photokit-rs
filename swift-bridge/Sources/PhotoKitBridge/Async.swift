@@ -45,66 +45,21 @@ public func ph_photo_library_request_authorization_async(
     }
 }
 
-@_cdecl("ph_asset_change_request_perform_async")
-public func ph_asset_change_request_perform_async(
-    _ payloadJSON: UnsafePointer<CChar>?,
-    _ cb: PKRAsyncJSONCallback,
-    _ ctx: UnsafeMutableRawPointer
+func pkrPerformChanges(
+    _ change: @escaping () throws -> String?,
+    callback cb: PKRAsyncJSONCallback,
+    context ctx: UnsafeMutableRawPointer
 ) {
-    guard let payload = try? pkrDecodeJSON(payloadJSON, as: PKRAssetChangeRequestPayload.self) else {
-        "invalid asset change request payload".withCString { cb(nil, $0, ctx) }
-        return
-    }
-
-    var placeholderLocalIdentifier: String? = nil
+    var placeholderLocalIdentifier: String?
+    var changeError: Error?
     PHPhotoLibrary.shared().performChanges({
-        let request: PHAssetChangeRequest
-        if let assetLocalIdentifier = payload.assetLocalIdentifier {
-            request = PHAssetChangeRequest(for: try! pkrRequestAsset(localIdentifier: assetLocalIdentifier))
-        } else if let imageFileURL = payload.createImageFileURL {
-            guard let created = PHAssetChangeRequest.creationRequestForAssetFromImage(
-                atFileURL: pkrAssetCreationURL(imageFileURL)
-            ) else {
-                return
-            }
-            request = created
-        } else if let imageDataBase64 = payload.createImageDataBase64,
-                  let data = Data(base64Encoded: imageDataBase64),
-                  let image = NSImage(data: data) {
-            request = PHAssetChangeRequest.creationRequestForAsset(from: image)
-        } else if let videoFileURL = payload.createVideoFileURL,
-                  let created = PHAssetChangeRequest.creationRequestForAssetFromVideo(
-                    atFileURL: pkrAssetCreationURL(videoFileURL)
-                  ) {
-            request = created
-        } else {
-            return
+        do {
+            placeholderLocalIdentifier = try change()
+        } catch {
+            changeError = error
         }
-
-        if let creationDate = pkrDate(from: payload.setCreationDate) {
-            request.creationDate = creationDate
-        }
-        if payload.clearCreationDate {
-            request.creationDate = nil
-        }
-        if let location = pkrLocation(from: payload.setLocation) {
-            request.location = location
-        }
-        if payload.clearLocation {
-            request.location = nil
-        }
-        if let favorite = payload.favorite {
-            request.isFavorite = favorite
-        }
-        if let hidden = payload.hidden {
-            request.isHidden = hidden
-        }
-        if payload.revertAssetContentToOriginal {
-            request.revertAssetContentToOriginal()
-        }
-        placeholderLocalIdentifier = request.placeholderForCreatedAsset?.localIdentifier
     }) { _, error in
-        if let error {
+        if let error = changeError ?? error {
             error.localizedDescription.withCString { cb(nil, $0, ctx) }
         } else if let json = try? pkrEncodeJSON(
             PKRChangeRequestPerformResultPayload(
@@ -116,6 +71,24 @@ public func ph_asset_change_request_perform_async(
             "encode failed".withCString { cb(nil, $0, ctx) }
         }
     }
+}
+
+@_cdecl("ph_asset_change_request_perform_async")
+public func ph_asset_change_request_perform_async(
+    _ payloadJSON: UnsafePointer<CChar>?,
+    _ cb: PKRAsyncJSONCallback,
+    _ ctx: UnsafeMutableRawPointer
+) {
+    let change: PKRResolvedAssetChange
+    do {
+        change = try pkrResolveAssetChange(
+            try pkrDecodeJSON(payloadJSON, as: PKRAssetChangeRequestPayload.self)
+        )
+    } catch {
+        error.localizedDescription.withCString { cb(nil, $0, ctx) }
+        return
+    }
+    pkrPerformChanges({ try pkrApplyAssetChange(change) }, callback: cb, context: ctx)
 }
 
 @_cdecl("ph_asset_collection_change_request_perform_async")
@@ -124,50 +97,16 @@ public func ph_asset_collection_change_request_perform_async(
     _ cb: PKRAsyncJSONCallback,
     _ ctx: UnsafeMutableRawPointer
 ) {
-    guard let payload = try? pkrDecodeJSON(
-        payloadJSON,
-        as: PKRAssetCollectionChangeRequestPayload.self
-    ) else {
-        "invalid collection change request payload".withCString { cb(nil, $0, ctx) }
+    let change: PKRResolvedAssetCollectionChange
+    do {
+        change = try pkrResolveAssetCollectionChange(
+            try pkrDecodeJSON(payloadJSON, as: PKRAssetCollectionChangeRequestPayload.self)
+        )
+    } catch {
+        error.localizedDescription.withCString { cb(nil, $0, ctx) }
         return
     }
-
-    var placeholderLocalIdentifier: String? = nil
-    PHPhotoLibrary.shared().performChanges({
-        let request: PHAssetCollectionChangeRequest
-        if let creationTitle = payload.creationTitle {
-            request = PHAssetCollectionChangeRequest.creationRequestForAssetCollection(
-                withTitle: creationTitle
-            )
-        } else if let identifier = payload.assetCollectionLocalIdentifier,
-                  let existing = PHAssetCollectionChangeRequest(
-                    for: try! pkrRequestAssetCollection(localIdentifier: identifier)
-                  ) {
-            request = existing
-        } else {
-            return
-        }
-
-        if let title = payload.title {
-            request.title = title
-        }
-        for mutation in payload.assetMutations {
-            try! pkrApplyAssetCollectionMutation(mutation, to: request)
-        }
-        placeholderLocalIdentifier = request.placeholderForCreatedAssetCollection.localIdentifier
-    }) { _, error in
-        if let error {
-            error.localizedDescription.withCString { cb(nil, $0, ctx) }
-        } else if let json = try? pkrEncodeJSON(
-            PKRChangeRequestPerformResultPayload(
-                placeholderLocalIdentifier: placeholderLocalIdentifier
-            )
-        ) {
-            json.withCString { cb($0, nil, ctx) }
-        } else {
-            "encode failed".withCString { cb(nil, $0, ctx) }
-        }
-    }
+    pkrPerformChanges({ try pkrApplyAssetCollectionChange(change) }, callback: cb, context: ctx)
 }
 
 @_cdecl("ph_collection_list_change_request_perform_async")
@@ -176,58 +115,16 @@ public func ph_collection_list_change_request_perform_async(
     _ cb: PKRAsyncJSONCallback,
     _ ctx: UnsafeMutableRawPointer
 ) {
-    guard let payload = try? pkrDecodeJSON(
-        payloadJSON,
-        as: PKRCollectionListChangeRequestPayload.self
-    ) else {
-        "invalid collection list change request payload".withCString { cb(nil, $0, ctx) }
+    let change: PKRResolvedCollectionListChange
+    do {
+        change = try pkrResolveCollectionListChange(
+            try pkrDecodeJSON(payloadJSON, as: PKRCollectionListChangeRequestPayload.self)
+        )
+    } catch {
+        error.localizedDescription.withCString { cb(nil, $0, ctx) }
         return
     }
-
-    var placeholderLocalIdentifier: String? = nil
-    PHPhotoLibrary.shared().performChanges({
-        let request: PHCollectionListChangeRequest
-        if let creationTitle = payload.creationTitle {
-            request = PHCollectionListChangeRequest.creationRequestForCollectionList(
-                withTitle: creationTitle
-            )
-        } else if payload.topLevelUserCollections {
-            let result = PHCollection.fetchTopLevelUserCollections(with: nil)
-            guard let topLevel = PHCollectionListChangeRequest(
-                forTopLevelCollectionListUserCollections: result
-            ) else {
-                return
-            }
-            request = topLevel
-        } else if let identifier = payload.collectionListLocalIdentifier,
-                  let existing = PHCollectionListChangeRequest(
-                    for: try! pkrRequestCollectionList(localIdentifier: identifier)
-                  ) {
-            request = existing
-        } else {
-            return
-        }
-
-        if let title = payload.title {
-            request.title = title
-        }
-        for mutation in payload.childMutations {
-            try! pkrApplyCollectionListMutation(mutation, to: request)
-        }
-        placeholderLocalIdentifier = request.placeholderForCreatedCollectionList.localIdentifier
-    }) { _, error in
-        if let error {
-            error.localizedDescription.withCString { cb(nil, $0, ctx) }
-        } else if let json = try? pkrEncodeJSON(
-            PKRChangeRequestPerformResultPayload(
-                placeholderLocalIdentifier: placeholderLocalIdentifier
-            )
-        ) {
-            json.withCString { cb($0, nil, ctx) }
-        } else {
-            "encode failed".withCString { cb(nil, $0, ctx) }
-        }
-    }
+    pkrPerformChanges({ try pkrApplyCollectionListChange(change) }, callback: cb, context: ctx)
 }
 
 @_cdecl("ph_image_manager_request_image_async")

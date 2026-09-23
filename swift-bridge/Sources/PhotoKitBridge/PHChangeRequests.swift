@@ -50,9 +50,8 @@ struct PKRCollectionListChangeRequestPayload: Codable {
     var childMutations: [PKRCollectionListChildMutationPayload]
 }
 
-func pkrDate(from string: String?) -> Date? {
-    guard let string else { return nil }
-    return ISO8601DateFormatter().date(from: string)
+func pkrDate(from string: String?) throws -> Date? {
+    try string.map(pkrParseDate)
 }
 
 func pkrLocation(from payload: PKRCoordinatePayload?) -> CLLocation? {
@@ -60,8 +59,169 @@ func pkrLocation(from payload: PKRCoordinatePayload?) -> CLLocation? {
     return CLLocation(latitude: payload.latitude, longitude: payload.longitude)
 }
 
-func pkrIndexSet(_ indexes: [Int]) -> IndexSet {
-    IndexSet(indexes)
+enum PKRMutationKind: String {
+    case add
+    case insert
+    case remove
+    case removeAtIndexes
+    case replace
+    case move
+}
+
+struct PKRResolvedMutation<Element> {
+    var kind: PKRMutationKind
+    var objects: [Element]
+    var indexes: IndexSet
+    var toIndex: Int
+}
+
+func pkrCheckedIndexes(_ indexes: [Int], below limit: Int) throws -> IndexSet {
+    guard indexes.allSatisfy({ $0 >= 0 && $0 < limit }) else {
+        throw pkrError("mutation indexes \(indexes) are outside 0..<\(limit)")
+    }
+    let indexSet = IndexSet(indexes)
+    guard indexSet.count == indexes.count else {
+        throw pkrError("mutation indexes \(indexes) contain duplicates")
+    }
+    return indexSet
+}
+
+func pkrResolveMutation<Element>(
+    kind rawKind: String,
+    objects: [Element],
+    indexes rawIndexes: [Int],
+    toIndex rawToIndex: Int?,
+    count: inout Int?
+) throws -> PKRResolvedMutation<Element> {
+    guard let kind = PKRMutationKind(rawValue: rawKind) else {
+        throw pkrError("unsupported mutation kind: \(rawKind)")
+    }
+    if kind == .add || kind == .remove {
+        count = nil
+        return PKRResolvedMutation(kind: kind, objects: objects, indexes: IndexSet(), toIndex: 0)
+    }
+    guard let current = count else {
+        throw pkrError("index-based mutations cannot follow add or remove in the same change request")
+    }
+    if (kind == .insert || kind == .replace) && objects.count != rawIndexes.count {
+        throw pkrError("\(rawKind) needs exactly one index per object")
+    }
+    let limit = kind == .insert ? current + objects.count : current
+    let indexes = try pkrCheckedIndexes(rawIndexes, below: limit)
+    var toIndex = 0
+    switch kind {
+    case .insert:
+        count = limit
+    case .removeAtIndexes:
+        count = current - indexes.count
+    case .move:
+        guard let destination = rawToIndex, destination >= 0, destination <= current - indexes.count else {
+            throw pkrError("move destination index is outside 0...\(current - indexes.count)")
+        }
+        toIndex = destination
+    case .add, .remove, .replace:
+        break
+    }
+    return PKRResolvedMutation(kind: kind, objects: objects, indexes: indexes, toIndex: toIndex)
+}
+
+func pkrPerformChangesAndWait(_ change: @escaping () throws -> String?) throws -> String? {
+    var placeholder: String?
+    var changeError: Error?
+    try PHPhotoLibrary.shared().performChangesAndWait {
+        do {
+            placeholder = try change()
+        } catch {
+            changeError = error
+        }
+    }
+    if let changeError {
+        throw changeError
+    }
+    return placeholder
+}
+
+enum PKRAssetChangeSource {
+    case existing(PHAsset)
+    case imageFile(URL)
+    case imageData(NSImage)
+    case videoFile(URL)
+}
+
+struct PKRResolvedAssetChange {
+    var source: PKRAssetChangeSource
+    var creationDate: Date?
+    var payload: PKRAssetChangeRequestPayload
+}
+
+func pkrResolveAssetChange(_ payload: PKRAssetChangeRequestPayload) throws -> PKRResolvedAssetChange {
+    let source: PKRAssetChangeSource
+    if let identifier = payload.assetLocalIdentifier {
+        source = .existing(try pkrRequestAsset(localIdentifier: identifier))
+    } else if let imageFileURL = payload.createImageFileURL {
+        source = .imageFile(try pkrReadableFileURL(imageFileURL))
+    } else if let imageDataBase64 = payload.createImageDataBase64 {
+        guard let data = Data(base64Encoded: imageDataBase64) else {
+            throw pkrError("image data is not valid base64")
+        }
+        guard let image = NSImage(data: data) else {
+            throw pkrError("image data is not a decodable image")
+        }
+        source = .imageData(image)
+    } else if let videoFileURL = payload.createVideoFileURL {
+        source = .videoFile(try pkrReadableFileURL(videoFileURL))
+    } else {
+        throw pkrError("asset change request needs an asset identifier or a creation source")
+    }
+    return PKRResolvedAssetChange(
+        source: source,
+        creationDate: try pkrDate(from: payload.setCreationDate),
+        payload: payload
+    )
+}
+
+func pkrApplyAssetChange(_ change: PKRResolvedAssetChange) throws -> String? {
+    let request: PHAssetChangeRequest
+    switch change.source {
+    case .existing(let asset):
+        request = PHAssetChangeRequest(for: asset)
+    case .imageFile(let url):
+        guard let created = PHAssetChangeRequest.creationRequestForAssetFromImage(atFileURL: url) else {
+            throw pkrError("cannot create an image asset from \(url.path)")
+        }
+        request = created
+    case .imageData(let image):
+        request = PHAssetChangeRequest.creationRequestForAsset(from: image)
+    case .videoFile(let url):
+        guard let created = PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: url) else {
+            throw pkrError("cannot create a video asset from \(url.path)")
+        }
+        request = created
+    }
+
+    let payload = change.payload
+    if let creationDate = change.creationDate {
+        request.creationDate = creationDate
+    }
+    if payload.clearCreationDate {
+        request.creationDate = nil
+    }
+    if let location = pkrLocation(from: payload.setLocation) {
+        request.location = location
+    }
+    if payload.clearLocation {
+        request.location = nil
+    }
+    if let favorite = payload.favorite {
+        request.isFavorite = favorite
+    }
+    if let hidden = payload.hidden {
+        request.isHidden = hidden
+    }
+    if payload.revertAssetContentToOriginal {
+        request.revertAssetContentToOriginal()
+    }
+    return request.placeholderForCreatedAsset?.localIdentifier
 }
 
 @_cdecl("ph_asset_change_request_perform_json")
@@ -70,51 +230,8 @@ public func ph_asset_change_request_perform_json(
     _ outError: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> UnsafeMutablePointer<CChar>? {
     do {
-        let payload = try pkrDecodeJSON(payloadJSON, as: PKRAssetChangeRequestPayload.self)
-        var placeholderLocalIdentifier: String?
-        try PHPhotoLibrary.shared().performChangesAndWait {
-            let request: PHAssetChangeRequest
-            if let assetLocalIdentifier = payload.assetLocalIdentifier {
-                request = PHAssetChangeRequest(for: try! pkrRequestAsset(localIdentifier: assetLocalIdentifier))
-            } else if let imageFileURL = payload.createImageFileURL {
-                guard let created = PHAssetChangeRequest.creationRequestForAssetFromImage(atFileURL: pkrAssetCreationURL(imageFileURL)) else {
-                    fatalError("failed to create image asset change request")
-                }
-                request = created
-            } else if let imageDataBase64 = payload.createImageDataBase64,
-                      let data = Data(base64Encoded: imageDataBase64),
-                      let image = NSImage(data: data) {
-                request = PHAssetChangeRequest.creationRequestForAsset(from: image)
-            } else if let videoFileURL = payload.createVideoFileURL,
-                      let created = PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: pkrAssetCreationURL(videoFileURL)) {
-                request = created
-            } else {
-                fatalError("invalid asset change request payload")
-            }
-
-            if let creationDate = pkrDate(from: payload.setCreationDate) {
-                request.creationDate = creationDate
-            }
-            if payload.clearCreationDate {
-                request.creationDate = nil
-            }
-            if let location = pkrLocation(from: payload.setLocation) {
-                request.location = location
-            }
-            if payload.clearLocation {
-                request.location = nil
-            }
-            if let favorite = payload.favorite {
-                request.isFavorite = favorite
-            }
-            if let hidden = payload.hidden {
-                request.isHidden = hidden
-            }
-            if payload.revertAssetContentToOriginal {
-                request.revertAssetContentToOriginal()
-            }
-            placeholderLocalIdentifier = request.placeholderForCreatedAsset?.localIdentifier
-        }
+        let change = try pkrResolveAssetChange(try pkrDecodeJSON(payloadJSON, as: PKRAssetChangeRequestPayload.self))
+        let placeholderLocalIdentifier = try pkrPerformChangesAndWait { try pkrApplyAssetChange(change) }
         return pkrCString(try pkrEncodeJSON(PKRChangeRequestPerformResultPayload(placeholderLocalIdentifier: placeholderLocalIdentifier)))
     } catch {
         pkrSetError(outError, error)
@@ -140,23 +257,78 @@ public func ph_asset_change_request_delete_assets_json(
     }
 }
 
-func pkrApplyAssetCollectionMutation(_ mutation: PKRAssetCollectionAssetMutationPayload, to request: PHAssetCollectionChangeRequest) throws {
-    switch mutation.kind {
-    case "add":
-        request.addAssets(NSArray(array: try mutation.assetLocalIdentifiers.map(pkrRequestAsset)))
-    case "insert":
-        request.insertAssets(NSArray(array: try mutation.assetLocalIdentifiers.map(pkrRequestAsset)), at: pkrIndexSet(mutation.indexes))
-    case "remove":
-        request.removeAssets(NSArray(array: try mutation.assetLocalIdentifiers.map(pkrRequestAsset)))
-    case "removeAtIndexes":
-        request.removeAssets(at: pkrIndexSet(mutation.indexes))
-    case "replace":
-        request.replaceAssets(at: pkrIndexSet(mutation.indexes), withAssets: NSArray(array: try mutation.assetLocalIdentifiers.map(pkrRequestAsset)))
-    case "move":
-        request.moveAssets(at: pkrIndexSet(mutation.indexes), to: mutation.toIndex ?? 0)
-    default:
-        break
+enum PKRAssetCollectionTarget {
+    case create(String)
+    case existing(PHAssetCollection, PHFetchResult<PHAsset>)
+}
+
+struct PKRResolvedAssetCollectionChange {
+    var target: PKRAssetCollectionTarget
+    var title: String?
+    var mutations: [PKRResolvedMutation<PHAsset>]
+}
+
+func pkrResolveAssetCollectionChange(_ payload: PKRAssetCollectionChangeRequestPayload) throws -> PKRResolvedAssetCollectionChange {
+    let target: PKRAssetCollectionTarget
+    var count: Int?
+    if let creationTitle = payload.creationTitle {
+        target = .create(creationTitle)
+        count = 0
+    } else if let identifier = payload.assetCollectionLocalIdentifier {
+        let collection = try pkrRequestAssetCollection(localIdentifier: identifier)
+        let assets = PHAsset.fetchAssets(in: collection, options: nil)
+        target = .existing(collection, assets)
+        count = assets.count
+    } else {
+        throw pkrError("asset collection change request needs a creation title or a collection identifier")
     }
+    let mutations = try payload.assetMutations.map { mutation in
+        try pkrResolveMutation(
+            kind: mutation.kind,
+            objects: mutation.assetLocalIdentifiers.map(pkrRequestAsset),
+            indexes: mutation.indexes,
+            toIndex: mutation.toIndex,
+            count: &count
+        )
+    }
+    return PKRResolvedAssetCollectionChange(target: target, title: payload.title, mutations: mutations)
+}
+
+func pkrApplyAssetCollectionChange(_ change: PKRResolvedAssetCollectionChange) throws -> String? {
+    let request: PHAssetCollectionChangeRequest
+    let isCreation: Bool
+    switch change.target {
+    case .create(let title):
+        request = PHAssetCollectionChangeRequest.creationRequestForAssetCollection(withTitle: title)
+        isCreation = true
+    case .existing(let collection, let assets):
+        guard let existing = PHAssetCollectionChangeRequest(for: collection, assets: assets) else {
+            throw pkrError("asset collection cannot be edited: \(collection.localIdentifier)")
+        }
+        request = existing
+        isCreation = false
+    }
+    if let title = change.title {
+        request.title = title
+    }
+    for mutation in change.mutations {
+        let assets = NSArray(array: mutation.objects)
+        switch mutation.kind {
+        case .add:
+            request.addAssets(assets)
+        case .insert:
+            request.insertAssets(assets, at: mutation.indexes)
+        case .remove:
+            request.removeAssets(assets)
+        case .removeAtIndexes:
+            request.removeAssets(at: mutation.indexes)
+        case .replace:
+            request.replaceAssets(at: mutation.indexes, withAssets: assets)
+        case .move:
+            request.moveAssets(at: mutation.indexes, to: mutation.toIndex)
+        }
+    }
+    return isCreation ? request.placeholderForCreatedAssetCollection.localIdentifier : nil
 }
 
 @_cdecl("ph_asset_collection_change_request_perform_json")
@@ -165,26 +337,8 @@ public func ph_asset_collection_change_request_perform_json(
     _ outError: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> UnsafeMutablePointer<CChar>? {
     do {
-        let payload = try pkrDecodeJSON(payloadJSON, as: PKRAssetCollectionChangeRequestPayload.self)
-        var placeholderLocalIdentifier: String?
-        try PHPhotoLibrary.shared().performChangesAndWait {
-            let request: PHAssetCollectionChangeRequest
-            if let creationTitle = payload.creationTitle {
-                request = PHAssetCollectionChangeRequest.creationRequestForAssetCollection(withTitle: creationTitle)
-            } else if let identifier = payload.assetCollectionLocalIdentifier,
-                      let existing = PHAssetCollectionChangeRequest(for: try! pkrRequestAssetCollection(localIdentifier: identifier)) {
-                request = existing
-            } else {
-                fatalError("invalid asset collection change request payload")
-            }
-            if let title = payload.title {
-                request.title = title
-            }
-            for mutation in payload.assetMutations {
-                try! pkrApplyAssetCollectionMutation(mutation, to: request)
-            }
-            placeholderLocalIdentifier = request.placeholderForCreatedAssetCollection.localIdentifier
-        }
+        let change = try pkrResolveAssetCollectionChange(try pkrDecodeJSON(payloadJSON, as: PKRAssetCollectionChangeRequestPayload.self))
+        let placeholderLocalIdentifier = try pkrPerformChangesAndWait { try pkrApplyAssetCollectionChange(change) }
         return pkrCString(try pkrEncodeJSON(PKRChangeRequestPerformResultPayload(placeholderLocalIdentifier: placeholderLocalIdentifier)))
     } catch {
         pkrSetError(outError, error)
@@ -210,23 +364,89 @@ public func ph_asset_collection_change_request_delete_json(
     }
 }
 
-func pkrApplyCollectionListMutation(_ mutation: PKRCollectionListChildMutationPayload, to request: PHCollectionListChangeRequest) throws {
-    switch mutation.kind {
-    case "add":
-        request.addChildCollections(NSArray(array: try mutation.childLocalIdentifiers.map(pkrRequestCollection)))
-    case "insert":
-        request.insertChildCollections(NSArray(array: try mutation.childLocalIdentifiers.map(pkrRequestCollection)), at: pkrIndexSet(mutation.indexes))
-    case "remove":
-        request.removeChildCollections(NSArray(array: try mutation.childLocalIdentifiers.map(pkrRequestCollection)))
-    case "removeAtIndexes":
-        request.removeChildCollections(at: pkrIndexSet(mutation.indexes))
-    case "replace":
-        request.replaceChildCollections(at: pkrIndexSet(mutation.indexes), withChildCollections: NSArray(array: try mutation.childLocalIdentifiers.map(pkrRequestCollection)))
-    case "move":
-        request.moveChildCollections(at: pkrIndexSet(mutation.indexes), to: mutation.toIndex ?? 0)
-    default:
-        break
+enum PKRCollectionListTarget {
+    case create(String)
+    case topLevel(PHFetchResult<PHCollection>)
+    case existing(PHCollectionList, PHFetchResult<PHCollection>)
+}
+
+struct PKRResolvedCollectionListChange {
+    var target: PKRCollectionListTarget
+    var title: String?
+    var mutations: [PKRResolvedMutation<PHCollection>]
+}
+
+func pkrResolveCollectionListChange(_ payload: PKRCollectionListChangeRequestPayload) throws -> PKRResolvedCollectionListChange {
+    let target: PKRCollectionListTarget
+    var count: Int?
+    if let creationTitle = payload.creationTitle {
+        target = .create(creationTitle)
+        count = 0
+    } else if payload.topLevelUserCollections {
+        let children = PHCollection.fetchTopLevelUserCollections(with: nil)
+        target = .topLevel(children)
+        count = children.count
+    } else if let identifier = payload.collectionListLocalIdentifier {
+        let collectionList = try pkrRequestCollectionList(localIdentifier: identifier)
+        let children = PHCollection.fetchCollections(in: collectionList, options: nil)
+        target = .existing(collectionList, children)
+        count = children.count
+    } else {
+        throw pkrError("collection list change request needs a creation title, the top-level list, or a collection list identifier")
     }
+    let mutations = try payload.childMutations.map { mutation in
+        try pkrResolveMutation(
+            kind: mutation.kind,
+            objects: mutation.childLocalIdentifiers.map(pkrRequestCollection),
+            indexes: mutation.indexes,
+            toIndex: mutation.toIndex,
+            count: &count
+        )
+    }
+    return PKRResolvedCollectionListChange(target: target, title: payload.title, mutations: mutations)
+}
+
+func pkrApplyCollectionListChange(_ change: PKRResolvedCollectionListChange) throws -> String? {
+    let request: PHCollectionListChangeRequest
+    let isCreation: Bool
+    switch change.target {
+    case .create(let title):
+        request = PHCollectionListChangeRequest.creationRequestForCollectionList(withTitle: title)
+        isCreation = true
+    case .topLevel(let children):
+        guard let topLevel = PHCollectionListChangeRequest(forTopLevelCollectionListUserCollections: children) else {
+            throw pkrError("the top-level collection list cannot be edited")
+        }
+        request = topLevel
+        isCreation = false
+    case .existing(let collectionList, let children):
+        guard let existing = PHCollectionListChangeRequest(for: collectionList, childCollections: children) else {
+            throw pkrError("collection list cannot be edited: \(collectionList.localIdentifier)")
+        }
+        request = existing
+        isCreation = false
+    }
+    if let title = change.title {
+        request.title = title
+    }
+    for mutation in change.mutations {
+        let collections = NSArray(array: mutation.objects)
+        switch mutation.kind {
+        case .add:
+            request.addChildCollections(collections)
+        case .insert:
+            request.insertChildCollections(collections, at: mutation.indexes)
+        case .remove:
+            request.removeChildCollections(collections)
+        case .removeAtIndexes:
+            request.removeChildCollections(at: mutation.indexes)
+        case .replace:
+            request.replaceChildCollections(at: mutation.indexes, withChildCollections: collections)
+        case .move:
+            request.moveChildCollections(at: mutation.indexes, to: mutation.toIndex)
+        }
+    }
+    return isCreation ? request.placeholderForCreatedCollectionList.localIdentifier : nil
 }
 
 @_cdecl("ph_collection_list_change_request_perform_json")
@@ -235,32 +455,8 @@ public func ph_collection_list_change_request_perform_json(
     _ outError: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> UnsafeMutablePointer<CChar>? {
     do {
-        let payload = try pkrDecodeJSON(payloadJSON, as: PKRCollectionListChangeRequestPayload.self)
-        var placeholderLocalIdentifier: String?
-        try PHPhotoLibrary.shared().performChangesAndWait {
-            let request: PHCollectionListChangeRequest
-            if let creationTitle = payload.creationTitle {
-                request = PHCollectionListChangeRequest.creationRequestForCollectionList(withTitle: creationTitle)
-            } else if payload.topLevelUserCollections {
-                let result = PHCollection.fetchTopLevelUserCollections(with: nil)
-                guard let topLevel = PHCollectionListChangeRequest(forTopLevelCollectionListUserCollections: result) else {
-                    fatalError("failed to create top-level collection list change request")
-                }
-                request = topLevel
-            } else if let identifier = payload.collectionListLocalIdentifier,
-                      let existing = PHCollectionListChangeRequest(for: try! pkrRequestCollectionList(localIdentifier: identifier)) {
-                request = existing
-            } else {
-                fatalError("invalid collection list change request payload")
-            }
-            if let title = payload.title {
-                request.title = title
-            }
-            for mutation in payload.childMutations {
-                try! pkrApplyCollectionListMutation(mutation, to: request)
-            }
-            placeholderLocalIdentifier = request.placeholderForCreatedCollectionList.localIdentifier
-        }
+        let change = try pkrResolveCollectionListChange(try pkrDecodeJSON(payloadJSON, as: PKRCollectionListChangeRequestPayload.self))
+        let placeholderLocalIdentifier = try pkrPerformChangesAndWait { try pkrApplyCollectionListChange(change) }
         return pkrCString(try pkrEncodeJSON(PKRChangeRequestPerformResultPayload(placeholderLocalIdentifier: placeholderLocalIdentifier)))
     } catch {
         pkrSetError(outError, error)

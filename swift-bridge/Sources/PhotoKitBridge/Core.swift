@@ -94,6 +94,15 @@ public func pkrDateString(_ date: Date?) -> String? {
     return pkrFractionalDateFormatter.string(from: date)
 }
 
+private let pkrInternetDateFormatter = ISO8601DateFormatter()
+
+public func pkrParseDate(_ string: String) throws -> Date {
+    guard let date = pkrFractionalDateFormatter.date(from: string) ?? pkrInternetDateFormatter.date(from: string) else {
+        throw pkrError("invalid ISO 8601 date: \(string)")
+    }
+    return date
+}
+
 public func pkrEncodeJSON<T: Encodable>(_ value: T) throws -> String {
     let encoder = JSONEncoder()
     let data = try encoder.encode(value)
@@ -118,6 +127,31 @@ public func pkrDecodeJSON<T: Decodable>(_ json: UnsafePointer<CChar>?, as type: 
 
     let data = Data(String(cString: json).utf8)
     return try JSONDecoder().decode(T.self, from: data)
+}
+
+public func pkrError(_ message: String) -> NSError {
+    NSError(domain: "photokit-rs", code: -1, userInfo: [NSLocalizedDescriptionKey: message])
+}
+
+public func pkrFileURL(_ value: String) throws -> URL {
+    if value.hasPrefix("file://") {
+        guard let url = URL(string: value), url.isFileURL, !url.path.isEmpty else {
+            throw pkrError("invalid file URL: \(value)")
+        }
+        return url
+    }
+    guard !value.isEmpty else {
+        throw pkrError("empty file path")
+    }
+    return URL(fileURLWithPath: value)
+}
+
+public func pkrReadableFileURL(_ value: String) throws -> URL {
+    let url = try pkrFileURL(value)
+    guard FileManager.default.isReadableFile(atPath: url.path) else {
+        throw pkrError("file is not readable: \(url.path)")
+    }
+    return url
 }
 
 public func pkrErrorPayload(from error: Error) -> PKRErrorPayload {
