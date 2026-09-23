@@ -104,42 +104,25 @@ public func ph_asset_request_content_editing_input(
         options.isNetworkAccessAllowed = payload.networkAccessAllowed
         options.canHandleAdjustmentData = { _ in payload.acceptsAnyAdjustmentData }
 
-        let semaphore = DispatchSemaphore(value: 0)
-        var result: PHContentEditingInput?
-        var requestError: Error?
-        var requestID: PHContentEditingInputRequestID = 0
-        requestID = asset.requestContentEditingInput(with: options) { input, info in
+        let slot = PKRResultSlot<PHContentEditingInput?>()
+        let requestID = asset.requestContentEditingInput(with: options) { input, info in
             if let error = info[PHContentEditingInputErrorKey] as? Error {
-                requestError = error
-            } else if (info[PHContentEditingInputCancelledKey] as? NSNumber)?.boolValue == true {
-                requestError = NSError(
-                    domain: "photokit-rs",
-                    code: -1,
-                    userInfo: [NSLocalizedDescriptionKey: "content editing input request cancelled"]
-                )
-            } else if (info[PHContentEditingInputResultIsInCloudKey] as? NSNumber)?.boolValue == true {
-                requestError = NSError(
-                    domain: "photokit-rs",
-                    code: -1,
-                    userInfo: [NSLocalizedDescriptionKey: "content editing input is in iCloud"]
-                )
+                slot.fill(.failure(error))
+            } else if pkrInfoFlag(info, PHContentEditingInputCancelledKey) {
+                slot.fill(.failure(pkrError("content editing input request cancelled")))
+            } else if pkrInfoFlag(info, PHContentEditingInputResultIsInCloudKey) {
+                slot.fill(.failure(pkrError("content editing input is in iCloud")))
+            } else {
+                slot.fill(.success(input))
             }
-            result = input
-            semaphore.signal()
         }
 
-        let timeout = DispatchTime.now() + .milliseconds(Int(timeoutMs))
-        if semaphore.wait(timeout: timeout) == .timedOut {
+        guard let outcome = slot.wait(timeoutMs: timeoutMs) else {
             asset.cancelContentEditingInputRequest(requestID)
             pkrSetMessageError(outError, message: "content editing input request timed out")
             return nil
         }
-
-        if let requestError {
-            pkrSetError(outError, requestError)
-            return nil
-        }
-        guard let result else {
+        guard let result = try outcome.get() else {
             pkrSetMessageError(outError, message: "missing PHContentEditingInput result")
             return nil
         }

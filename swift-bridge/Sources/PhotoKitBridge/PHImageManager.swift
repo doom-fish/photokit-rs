@@ -22,34 +22,101 @@ final class PKRCachingImageManagerBox: NSObject {
 }
 
 final class PKRRequestBox: NSObject {
-    var requestID: Int32 = 0
-    var payloadJSON: String?
-    var cancelPayloadJSON: String?
-    var error: Error?
-    var completed = false
-    var cancelHandler: (() -> Void)?
+    private let lock = NSLock()
+    private let cancelPayloadJSON: String?
+    private var payloadJSON: String?
+    private var error: Error?
+    private var completed = false
+    private var cancelHandler: (() -> Void)?
     let semaphore = DispatchSemaphore(value: 0)
 
-    func finish<T: Encodable>(_ payload: T) {
-        guard !completed else { return }
-        payloadJSON = try? pkrEncodeJSON(payload)
-        completed = true
-        semaphore.signal()
+    init(cancelPayloadJSON: String?) {
+        self.cancelPayloadJSON = cancelPayloadJSON
+        super.init()
     }
 
-    func fail(_ error: Error) {
-        guard !completed else { return }
-        self.error = error
-        completed = true
-        semaphore.signal()
+    func setCancelHandler(_ handler: @escaping () -> Void) {
+        lock.lock()
+        cancelHandler = handler
+        lock.unlock()
+    }
+
+    func finish<T: Encodable>(_ payload: T) {
+        do {
+            complete(payloadJSON: try pkrEncodeJSON(payload), error: nil)
+        } catch {
+            complete(payloadJSON: nil, error: error)
+        }
+    }
+
+    func cancelRequest() {
+        lock.lock()
+        let handler = cancelHandler
+        lock.unlock()
+        handler?()
     }
 
     func cancel() {
-        cancelHandler?()
-        guard !completed else { return }
-        payloadJSON = cancelPayloadJSON
+        cancelRequest()
+        complete(payloadJSON: cancelPayloadJSON, error: nil)
+    }
+
+    func outcome() -> (payloadJSON: String?, error: Error?)? {
+        lock.lock()
+        defer { lock.unlock() }
+        return completed ? (payloadJSON, error) : nil
+    }
+
+    private func complete(payloadJSON: String?, error: Error?) {
+        lock.lock()
+        guard !completed else {
+            lock.unlock()
+            return
+        }
         completed = true
+        self.payloadJSON = payloadJSON
+        self.error = error
+        lock.unlock()
         semaphore.signal()
+    }
+}
+
+final class PKRResultSlot<Value> {
+    private let lock = NSLock()
+    private var result: Result<Value, Error>?
+    let semaphore = DispatchSemaphore(value: 0)
+
+    func fill(_ value: Result<Value, Error>) {
+        lock.lock()
+        guard result == nil else {
+            lock.unlock()
+            return
+        }
+        result = value
+        lock.unlock()
+        semaphore.signal()
+    }
+
+    func wait(timeoutMs: UInt64) -> Result<Value, Error>? {
+        guard pkrWait(semaphore, timeoutMs: timeoutMs) else {
+            return nil
+        }
+        lock.lock()
+        defer { lock.unlock() }
+        return result
+    }
+}
+
+final class PKROnce {
+    private let lock = NSLock()
+    private var claimed = false
+
+    func claim() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !claimed else { return false }
+        claimed = true
+        return true
     }
 }
 
@@ -144,6 +211,40 @@ func pkrResultErrorPayload(from info: [AnyHashable: Any], key: String) -> PKRErr
     (info[key] as? NSError).map(pkrErrorPayload)
 }
 
+func pkrInfoFlag(_ info: [AnyHashable: Any], _ keys: String...) -> Bool {
+    keys.contains { (info[$0] as? NSNumber)?.boolValue == true }
+}
+
+func pkrDeliversSingleResult(deliveryMode: String?, synchronous: Bool) -> Bool {
+    synchronous || deliveryMode == "highQualityFormat" || deliveryMode == "fastFormat"
+}
+
+func pkrIsFinalImageResult(_ info: [AnyHashable: Any], hasResult: Bool, singleResult: Bool) -> Bool {
+    if singleResult || pkrInfoFlag(info, PHImageCancelledKey, PHLivePhotoInfoCancelledKey) {
+        return true
+    }
+    if info[PHImageErrorKey] != nil || info[PHLivePhotoInfoErrorKey] != nil {
+        return true
+    }
+    if !hasResult && pkrInfoFlag(info, PHImageResultIsInCloudKey) {
+        return true
+    }
+    return !pkrInfoFlag(info, PHImageResultIsDegradedKey, PHLivePhotoInfoIsDegradedKey)
+}
+
+func pkrImageResultPayload(_ image: NSImage?, info: [AnyHashable: Any]) -> PKRImageResultPayload {
+    let tiffData = image?.tiffRepresentation
+    return PKRImageResultPayload(
+        tiffDataBase64: tiffData?.base64EncodedString() ?? "",
+        width: tiffData == nil ? 0 : Double(image?.size.width ?? 0),
+        height: tiffData == nil ? 0 : Double(image?.size.height ?? 0),
+        cancelled: pkrInfoFlag(info, PHImageCancelledKey),
+        degraded: pkrInfoFlag(info, PHImageResultIsDegradedKey),
+        requestID: pkrRequestID(from: info),
+        error: pkrResultErrorPayload(from: info, key: PHImageErrorKey)
+    )
+}
+
 func pkrBuildImageRequestOptions(_ payload: PKRImageRequestPayload) -> PHImageRequestOptions {
     let options = PHImageRequestOptions()
     if let version = payload.version {
@@ -231,12 +332,13 @@ func pkrBuildVideoRequestOptions(_ payload: PKRVideoRequestOptionsPayload) -> PH
 func pkrLivePhotoResultPayload(_ livePhoto: PHLivePhoto?, info: [AnyHashable: Any]) -> PKRLivePhotoResultPayload {
     PKRLivePhotoResultPayload(
         hasLivePhoto: livePhoto != nil,
-        cancelled: (info[PHImageCancelledKey] as? NSNumber)?.boolValue ?? false,
-        degraded: (info[PHImageResultIsDegradedKey] as? NSNumber)?.boolValue ?? false,
+        cancelled: pkrInfoFlag(info, PHImageCancelledKey, PHLivePhotoInfoCancelledKey),
+        degraded: pkrInfoFlag(info, PHImageResultIsDegradedKey, PHLivePhotoInfoIsDegradedKey),
         sizeWidth: livePhoto.map { Double($0.size.width) } ?? 0,
         sizeHeight: livePhoto.map { Double($0.size.height) } ?? 0,
         requestID: pkrRequestID(from: info),
         error: pkrResultErrorPayload(from: info, key: PHLivePhotoInfoErrorKey)
+            ?? pkrResultErrorPayload(from: info, key: PHImageErrorKey)
     )
 }
 
@@ -249,7 +351,6 @@ func pkrAssetURLAndDuration(from asset: AVAsset?) -> (String?, Double?) {
 
 func pkrVideoResultPayload(
     resultType: String,
-    requestID: Int32,
     info: [AnyHashable: Any],
     asset: AVAsset?,
     hasPlayerItem: Bool,
@@ -262,7 +363,7 @@ func pkrVideoResultPayload(
     let (assetURL, durationSeconds) = pkrAssetURLAndDuration(from: asset)
     return PKRVideoResultPayload(
         resultType: resultType,
-        requestID: requestID,
+        requestID: pkrRequestID(from: info),
         cancelled: (info[PHImageCancelledKey] as? NSNumber)?.boolValue ?? false,
         isInCloud: (info[PHImageResultIsInCloudKey] as? NSNumber)?.boolValue ?? false,
         error: pkrResultErrorPayload(from: info, key: PHImageErrorKey),
@@ -282,36 +383,13 @@ func pkrWaitForRequestBox<T: Encodable>(
     cancel: (() -> Void)?,
     work: (_ finish: @escaping (T) -> Void, _ fail: @escaping (Error) -> Void) -> Void
 ) throws -> T {
-    let semaphore = DispatchSemaphore(value: 0)
-    var payload: T?
-    var requestError: Error?
-    work({ result in
-        payload = result
-        semaphore.signal()
-    }, { error in
-        requestError = error
-        semaphore.signal()
-    })
-    let timeout = DispatchTime.now() + .milliseconds(Int(timeoutMs))
-    guard semaphore.wait(timeout: timeout) == .success else {
+    let slot = PKRResultSlot<T>()
+    work({ slot.fill(.success($0)) }, { slot.fill(.failure($0)) })
+    guard let result = slot.wait(timeoutMs: timeoutMs) else {
         cancel?()
-        throw NSError(
-            domain: "photokit-rs",
-            code: -1,
-            userInfo: [NSLocalizedDescriptionKey: "request timed out"]
-        )
+        throw pkrError("request timed out")
     }
-    if let requestError {
-        throw requestError
-    }
-    guard let payload else {
-        throw NSError(
-            domain: "photokit-rs",
-            code: -1,
-            userInfo: [NSLocalizedDescriptionKey: "request completed without payload"]
-        )
-    }
-    return payload
+    return try result.get()
 }
 
 @_cdecl("ph_image_manager_default")
@@ -350,55 +428,34 @@ public func ph_image_manager_request_image(
         let request = try pkrDecodeJSON(requestJSON, as: PKRImageRequestPayload.self)
         let asset = try pkrRequestAsset(localIdentifier: String(cString: assetIdentifier))
         let imageManager = pkrBorrow(manager, as: PKRImageManagerBox.self).manager
-        let box = PKRRequestBox()
-        let targetSize = CGSize(width: request.targetWidth, height: request.targetHeight)
-        box.cancelPayloadJSON = try? pkrEncodeJSON(
-            PKRImageResultPayload(
-                tiffDataBase64: "",
-                width: 0,
-                height: 0,
-                cancelled: true,
-                degraded: false,
-                requestID: nil,
-                error: nil
+        let box = PKRRequestBox(
+            cancelPayloadJSON: try? pkrEncodeJSON(
+                PKRImageResultPayload(
+                    tiffDataBase64: "",
+                    width: 0,
+                    height: 0,
+                    cancelled: true,
+                    degraded: false,
+                    requestID: nil,
+                    error: nil
+                )
             )
         )
-        box.requestID = imageManager.requestImage(
+        let targetSize = CGSize(width: request.targetWidth, height: request.targetHeight)
+        let singleResult = pkrDeliversSingleResult(deliveryMode: request.deliveryMode, synchronous: request.synchronous)
+        let requestID = imageManager.requestImage(
             for: asset,
             targetSize: targetSize,
             contentMode: pkrContentMode(from: request.contentMode),
             options: pkrBuildImageRequestOptions(request)
         ) { image, info in
             let info = info ?? [:]
-            let cancelled = (info[PHImageCancelledKey] as? NSNumber)?.boolValue ?? false
-            let degraded = (info[PHImageResultIsDegradedKey] as? NSNumber)?.boolValue ?? false
-            guard let image, let data = image.tiffRepresentation else {
-                box.finish(
-                    PKRImageResultPayload(
-                        tiffDataBase64: "",
-                        width: 0,
-                        height: 0,
-                        cancelled: cancelled,
-                        degraded: degraded,
-                        requestID: pkrRequestID(from: info),
-                        error: pkrResultErrorPayload(from: info, key: PHImageErrorKey)
-                    )
-                )
+            guard pkrIsFinalImageResult(info, hasResult: image != nil, singleResult: singleResult) else {
                 return
             }
-            box.finish(
-                PKRImageResultPayload(
-                    tiffDataBase64: data.base64EncodedString(),
-                    width: image.size.width,
-                    height: image.size.height,
-                    cancelled: cancelled,
-                    degraded: degraded,
-                    requestID: pkrRequestID(from: info),
-                    error: pkrResultErrorPayload(from: info, key: PHImageErrorKey)
-                )
-            )
+            box.finish(pkrImageResultPayload(image, info: info))
         }
-        box.cancelHandler = { imageManager.cancelImageRequest(PHImageRequestID(box.requestID)) }
+        box.setCancelHandler { imageManager.cancelImageRequest(requestID) }
         return pkrRetain(box)
     } catch {
         pkrSetError(outError, error)
@@ -426,21 +483,22 @@ public func ph_image_manager_request_image_data(
         let request = try pkrDecodeJSON(requestJSON, as: PKRImageRequestPayload.self)
         let asset = try pkrRequestAsset(localIdentifier: String(cString: assetIdentifier))
         let imageManager = pkrBorrow(manager, as: PKRImageManagerBox.self).manager
-        let box = PKRRequestBox()
-        box.cancelPayloadJSON = try? pkrEncodeJSON(
-            PKRImageDataResultPayload(
-                dataBase64: "",
-                uniformTypeIdentifier: nil,
-                contentTypeIdentifier: nil,
-                orientation: 0,
-                cancelled: true,
-                degraded: false,
-                isInCloud: false,
-                requestID: nil,
-                error: nil
+        let box = PKRRequestBox(
+            cancelPayloadJSON: try? pkrEncodeJSON(
+                PKRImageDataResultPayload(
+                    dataBase64: "",
+                    uniformTypeIdentifier: nil,
+                    contentTypeIdentifier: nil,
+                    orientation: 0,
+                    cancelled: true,
+                    degraded: false,
+                    isInCloud: false,
+                    requestID: nil,
+                    error: nil
+                )
             )
         )
-        box.requestID = imageManager.requestImageDataAndOrientation(
+        let requestID = imageManager.requestImageDataAndOrientation(
             for: asset,
             options: pkrBuildImageRequestOptions(request)
         ) { imageData, dataUTI, orientation, info in
@@ -450,16 +508,16 @@ public func ph_image_manager_request_image_data(
                     dataBase64: imageData?.base64EncodedString() ?? "",
                     uniformTypeIdentifier: dataUTI,
                     contentTypeIdentifier: nil,
-                    orientation: Int32(orientation.rawValue),
-                    cancelled: (info[PHImageCancelledKey] as? NSNumber)?.boolValue ?? false,
-                    degraded: (info[PHImageResultIsDegradedKey] as? NSNumber)?.boolValue ?? false,
-                    isInCloud: (info[PHImageResultIsInCloudKey] as? NSNumber)?.boolValue ?? false,
+                    orientation: Int32(clamping: orientation.rawValue),
+                    cancelled: pkrInfoFlag(info, PHImageCancelledKey),
+                    degraded: pkrInfoFlag(info, PHImageResultIsDegradedKey),
+                    isInCloud: pkrInfoFlag(info, PHImageResultIsInCloudKey),
                     requestID: pkrRequestID(from: info),
                     error: pkrResultErrorPayload(from: info, key: PHImageErrorKey)
                 )
             )
         }
-        box.cancelHandler = { imageManager.cancelImageRequest(PHImageRequestID(box.requestID)) }
+        box.setCancelHandler { imageManager.cancelImageRequest(requestID) }
         return pkrRetain(box)
     } catch {
         pkrSetError(outError, error)
@@ -487,28 +545,34 @@ public func ph_image_manager_request_live_photo(
         let request = try pkrDecodeJSON(requestJSON, as: PKRImageRequestPayload.self)
         let asset = try pkrRequestAsset(localIdentifier: String(cString: assetIdentifier))
         let imageManager = pkrBorrow(manager, as: PKRImageManagerBox.self).manager
-        let box = PKRRequestBox()
-        let targetSize = CGSize(width: request.targetWidth, height: request.targetHeight)
-        box.cancelPayloadJSON = try? pkrEncodeJSON(
-            PKRLivePhotoResultPayload(
-                hasLivePhoto: false,
-                cancelled: true,
-                degraded: false,
-                sizeWidth: 0,
-                sizeHeight: 0,
-                requestID: nil,
-                error: nil
+        let box = PKRRequestBox(
+            cancelPayloadJSON: try? pkrEncodeJSON(
+                PKRLivePhotoResultPayload(
+                    hasLivePhoto: false,
+                    cancelled: true,
+                    degraded: false,
+                    sizeWidth: 0,
+                    sizeHeight: 0,
+                    requestID: nil,
+                    error: nil
+                )
             )
         )
-        box.requestID = imageManager.requestLivePhoto(
+        let targetSize = CGSize(width: request.targetWidth, height: request.targetHeight)
+        let singleResult = pkrDeliversSingleResult(deliveryMode: request.deliveryMode, synchronous: false)
+        let requestID = imageManager.requestLivePhoto(
             for: asset,
             targetSize: targetSize,
             contentMode: pkrContentMode(from: request.contentMode),
             options: pkrBuildLivePhotoRequestOptions(request)
         ) { livePhoto, info in
-            box.finish(pkrLivePhotoResultPayload(livePhoto, info: info ?? [:]))
+            let info = info ?? [:]
+            guard pkrIsFinalImageResult(info, hasResult: livePhoto != nil, singleResult: singleResult) else {
+                return
+            }
+            box.finish(pkrLivePhotoResultPayload(livePhoto, info: info))
         }
-        box.cancelHandler = { imageManager.cancelImageRequest(PHImageRequestID(box.requestID)) }
+        box.setCancelHandler { imageManager.cancelImageRequest(requestID) }
         return pkrRetain(box)
     } catch {
         pkrSetError(outError, error)
@@ -546,7 +610,6 @@ public func ph_image_manager_request_player_item_for_video_json(
                 finish(
                     pkrVideoResultPayload(
                         resultType: "playerItem",
-                        requestID: requestID,
                         info: info,
                         asset: playerItem?.asset,
                         hasPlayerItem: playerItem != nil,
@@ -602,7 +665,6 @@ public func ph_image_manager_request_export_session_for_video_json(
                 finish(
                     pkrVideoResultPayload(
                         resultType: "exportSession",
-                        requestID: requestID,
                         info: info,
                         asset: exportSession?.asset,
                         hasPlayerItem: false,
@@ -652,7 +714,6 @@ public func ph_image_manager_request_av_asset_for_video_json(
                 finish(
                     pkrVideoResultPayload(
                         resultType: "avAsset",
-                        requestID: requestID,
                         info: info,
                         asset: avAsset,
                         hasPlayerItem: false,
@@ -684,20 +745,24 @@ public func ph_image_request_wait_json(
     }
 
     let box = pkrBorrow(request, as: PKRRequestBox.self)
-    if !box.completed {
-        let timeout = DispatchTime.now() + .milliseconds(Int(timeoutMs))
-        if box.semaphore.wait(timeout: timeout) == .timedOut {
-            box.cancelHandler?()
-            pkrSetMessageError(outError, message: "request timed out")
-            return nil
-        }
+    if box.outcome() == nil && !pkrWait(box.semaphore, timeoutMs: timeoutMs) {
+        box.cancelRequest()
+        pkrSetMessageError(outError, message: "request timed out")
+        return nil
     }
-
-    if let error = box.error {
+    guard let outcome = box.outcome() else {
+        pkrSetMessageError(outError, message: "request finished without a result")
+        return nil
+    }
+    if let error = outcome.error {
         pkrSetError(outError, error)
         return nil
     }
-    return box.payloadJSON.flatMap(pkrCString)
+    guard let payloadJSON = outcome.payloadJSON else {
+        pkrSetMessageError(outError, message: "request finished without a result")
+        return nil
+    }
+    return pkrCString(payloadJSON)
 }
 
 @_cdecl("ph_image_request_cancel")

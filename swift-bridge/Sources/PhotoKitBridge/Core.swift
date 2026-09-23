@@ -133,6 +133,28 @@ public func pkrError(_ message: String) -> NSError {
     NSError(domain: "photokit-rs", code: -1, userInfo: [NSLocalizedDescriptionKey: message])
 }
 
+public func pkrDeadline(timeoutMs: UInt64) -> DispatchTime {
+    let (nanoseconds, overflow) = timeoutMs.multipliedReportingOverflow(by: 1_000_000)
+    guard !overflow, let interval = Int(exactly: nanoseconds) else {
+        return .distantFuture
+    }
+    return .now() + .nanoseconds(interval)
+}
+
+public func pkrWait(_ semaphore: DispatchSemaphore, timeoutMs: UInt64) -> Bool {
+    let deadline = pkrDeadline(timeoutMs: timeoutMs)
+    guard Thread.isMainThread else {
+        return semaphore.wait(timeout: deadline) == .success
+    }
+    while semaphore.wait(timeout: .now()) != .success {
+        guard DispatchTime.now() < deadline else {
+            return false
+        }
+        _ = RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.01))
+    }
+    return true
+}
+
 public func pkrFileURL(_ value: String) throws -> URL {
     if value.hasPrefix("file://") {
         guard let url = URL(string: value), url.isFileURL, !url.path.isEmpty else {

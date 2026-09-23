@@ -224,43 +224,29 @@ public func ph_live_photo_view_request_with_resource_file_urls(
     }
 
     do {
-        let fileURLs = try pkrDecodeJSON(fileURLsJSON, as: [String].self).map { value -> URL in
-            if value.hasPrefix("file://") {
-                return URL(string: value) ?? URL(fileURLWithPath: value)
-            }
-            return URL(fileURLWithPath: value)
-        }
+        let fileURLs = try pkrDecodeJSON(fileURLsJSON, as: [String].self).map(pkrFileURL)
         let request = try pkrDecodeJSON(requestJSON, as: PKRImageRequestPayload.self)
         let livePhotoView = pkrBorrow(view, as: PKRLivePhotoViewBox.self).view
-        let semaphore = DispatchSemaphore(value: 0)
-        var resultPayload = PKRLivePhotoResultPayload(
-            hasLivePhoto: false,
-            cancelled: false,
-            degraded: false,
-            sizeWidth: 0,
-            sizeHeight: 0,
-            requestID: nil,
-            error: nil
-        )
-        var requestID: PHLivePhotoRequestID = 0
-        requestID = PHLivePhoto.request(
+        let slot = PKRResultSlot<PKRLivePhotoResultPayload>()
+        let requestID = PHLivePhoto.request(
             withResourceFileURLs: fileURLs,
             placeholderImage: nil,
             targetSize: CGSize(width: request.targetWidth, height: request.targetHeight),
             contentMode: pkrContentMode(from: request.contentMode)
         ) { livePhoto, info in
             livePhotoView.livePhoto = livePhoto
-            resultPayload = pkrLivePhotoResultPayload(livePhoto, info: info)
-            semaphore.signal()
+            if pkrIsFinalImageResult(info, hasResult: livePhoto != nil, singleResult: false) {
+                slot.fill(.success(pkrLivePhotoResultPayload(livePhoto, info: info)))
+            }
         }
 
-        if semaphore.wait(timeout: .now() + .milliseconds(Int(timeoutMs))) == .timedOut {
+        guard let result = slot.wait(timeoutMs: timeoutMs) else {
             PHLivePhoto.cancelRequest(withRequestID: requestID)
             pkrSetMessageError(outError, message: "live photo view request timed out")
             return nil
         }
 
-        return pkrCString(try pkrEncodeJSON(resultPayload))
+        return pkrCString(try pkrEncodeJSON(try result.get()))
     } catch {
         pkrSetError(outError, error)
         return nil

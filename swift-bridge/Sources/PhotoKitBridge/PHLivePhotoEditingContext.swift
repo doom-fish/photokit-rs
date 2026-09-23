@@ -70,7 +70,7 @@ func pkrEncodeLivePhotoEditingContext(_ context: PHLivePhotoEditingContext) -> P
         durationSeconds: CMTimeGetSeconds(context.duration),
         photoTimeSeconds: CMTimeGetSeconds(context.photoTime),
         audioVolume: context.audioVolume,
-        orientation: Int32(context.orientation.rawValue)
+        orientation: Int32(clamping: context.orientation.rawValue)
     )
 }
 
@@ -194,34 +194,25 @@ public func ph_live_photo_editing_context_prepare_live_photo_json(
         return nil
     }
     let editingContext = pkrBorrow(context, as: PKRLivePhotoEditingContextBox.self).context
+    let slot = PKRResultSlot<PKRLivePhotoResultPayload>()
+    editingContext.prepareLivePhotoForPlayback(withTargetSize: CGSize(width: targetWidth, height: targetHeight), options: nil) { livePhoto, error in
+        slot.fill(.success(PKRLivePhotoResultPayload(
+            hasLivePhoto: livePhoto != nil,
+            cancelled: false,
+            degraded: false,
+            sizeWidth: Double(livePhoto?.size.width ?? 0),
+            sizeHeight: Double(livePhoto?.size.height ?? 0),
+            requestID: nil,
+            error: error.map(pkrErrorPayload)
+        )))
+    }
+    guard let result = slot.wait(timeoutMs: timeoutMs) else {
+        editingContext.cancel()
+        pkrSetMessageError(outError, message: "live photo playback preparation timed out")
+        return nil
+    }
     do {
-        let semaphore = DispatchSemaphore(value: 0)
-        var payload: PKRLivePhotoResultPayload?
-        var requestError: Error?
-        editingContext.prepareLivePhotoForPlayback(withTargetSize: CGSize(width: targetWidth, height: targetHeight), options: nil) { livePhoto, error in
-            if let error {
-                requestError = error
-            }
-            payload = PKRLivePhotoResultPayload(
-                hasLivePhoto: livePhoto != nil,
-                cancelled: false,
-                degraded: false,
-                sizeWidth: Double(livePhoto?.size.width ?? 0),
-                sizeHeight: Double(livePhoto?.size.height ?? 0),
-                requestID: nil,
-                error: error.map(pkrErrorPayload)
-            )
-            semaphore.signal()
-        }
-        let timeout = DispatchTime.now() + .milliseconds(Int(timeoutMs))
-        guard semaphore.wait(timeout: timeout) == .success else {
-            editingContext.cancel()
-            throw NSError(domain: "photokit-rs", code: -1, userInfo: [NSLocalizedDescriptionKey: "live photo playback preparation timed out"])
-        }
-        if let requestError, payload == nil {
-            throw requestError
-        }
-        return pkrCString(try pkrEncodeJSON(payload))
+        return pkrCString(try pkrEncodeJSON(try result.get()))
     } catch {
         pkrSetError(outError, error)
         return nil
@@ -244,23 +235,22 @@ public func ph_live_photo_editing_context_save_json(
         return nil
     }
     let editingContext = pkrBorrow(context, as: PKRLivePhotoEditingContextBox.self).context
-    let editingOutput = pkrBorrow(output, as: PHContentEditingOutput.self)
+    let editingOutput = pkrBorrow(output, as: PKRContentEditingOutputBox.self).output
+    let slot = PKRResultSlot<Bool>()
+    editingContext.saveLivePhoto(to: editingOutput, options: nil) { success, error in
+        if let error {
+            slot.fill(.failure(error))
+        } else {
+            slot.fill(.success(success))
+        }
+    }
+    guard let result = slot.wait(timeoutMs: timeoutMs) else {
+        editingContext.cancel()
+        pkrSetMessageError(outError, message: "live photo save timed out")
+        return nil
+    }
     do {
-        let semaphore = DispatchSemaphore(value: 0)
-        var payload = PKRLivePhotoEditingSaveResultPayload(success: false)
-        editingContext.saveLivePhoto(to: editingOutput, options: nil) { success, error in
-            payload = PKRLivePhotoEditingSaveResultPayload(success: success)
-            if let error {
-                pkrSetError(outError, error)
-            }
-            semaphore.signal()
-        }
-        let timeout = DispatchTime.now() + .milliseconds(Int(timeoutMs))
-        guard semaphore.wait(timeout: timeout) == .success else {
-            editingContext.cancel()
-            throw NSError(domain: "photokit-rs", code: -1, userInfo: [NSLocalizedDescriptionKey: "live photo save timed out"])
-        }
-        return pkrCString(try pkrEncodeJSON(payload))
+        return pkrCString(try pkrEncodeJSON(PKRLivePhotoEditingSaveResultPayload(success: try result.get())))
     } catch {
         pkrSetError(outError, error)
         return nil

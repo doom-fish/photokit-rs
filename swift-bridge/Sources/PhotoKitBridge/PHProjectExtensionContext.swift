@@ -83,21 +83,19 @@ public func ph_project_extension_context_updated_project_info_json(
     }
 
     let extensionContext = pkrBorrow(context, as: PHProjectExtensionContext.self)
-    let semaphore = DispatchSemaphore(value: 0)
-    var updatedProjectInfo: PHProjectInfo?
+    let slot = PKRResultSlot<PHProjectInfo?>()
     let progress = extensionContext.updatedProjectInfo(from: nil) { projectInfo in
-        updatedProjectInfo = projectInfo
-        semaphore.signal()
+        slot.fill(.success(projectInfo))
     }
 
-    if semaphore.wait(timeout: .now() + .milliseconds(Int(timeoutMs))) == .timedOut {
+    guard let result = slot.wait(timeoutMs: timeoutMs) else {
         progress.cancel()
         pkrSetMessageError(outError, message: "updated project info request timed out")
         return nil
     }
 
     do {
-        let payload = updatedProjectInfo.map(pkrEncodeProjectInfo)
+        let payload = try result.get().map(pkrEncodeProjectInfo)
         return pkrCString(try pkrEncodeJSON(payload))
     } catch {
         pkrSetError(outError, error)
