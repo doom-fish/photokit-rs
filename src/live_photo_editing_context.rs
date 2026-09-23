@@ -277,17 +277,21 @@ unsafe extern "C" fn live_photo_frame_processor_trampoline(
         return 0;
     }
 
-    FrameProcessorContext::with(user_info, "live_photo_frame_processor_trampoline", |callback| {
-        let frame_json = CStr::from_ptr(frame_json).to_string_lossy();
-        let Ok(frame) = serde_json::from_str::<PHLivePhotoFrame>(&frame_json) else {
-            return 0;
-        };
-        let mut callback = callback.lock().unwrap_or_else(PoisonError::into_inner);
-        match callback(frame) {
-            PHLivePhotoFrameProcessingDecision::KeepOriginal => 0,
-            PHLivePhotoFrameProcessingDecision::SkipFrame => 1,
-        }
-    })
+    FrameProcessorContext::with(
+        user_info,
+        "live_photo_frame_processor_trampoline",
+        |callback| {
+            let frame_json = CStr::from_ptr(frame_json).to_string_lossy();
+            let Ok(frame) = serde_json::from_str::<PHLivePhotoFrame>(&frame_json) else {
+                return 0;
+            };
+            let mut callback = callback.lock().unwrap_or_else(PoisonError::into_inner);
+            match callback(frame) {
+                PHLivePhotoFrameProcessingDecision::KeepOriginal => 0,
+                PHLivePhotoFrameProcessingDecision::SkipFrame => 1,
+            }
+        },
+    )
     .unwrap_or(0)
 }
 
@@ -329,7 +333,8 @@ mod tests {
         let skip = processor(PHLivePhotoFrameProcessingDecision::SkipFrame, &calls);
         let keep = processor(PHLivePhotoFrameProcessingDecision::KeepOriginal, &calls);
 
-        let skipped = unsafe { live_photo_frame_processor_trampoline(json.as_ptr(), skip.as_ptr()) };
+        let skipped =
+            unsafe { live_photo_frame_processor_trampoline(json.as_ptr(), skip.as_ptr()) };
         let kept = unsafe { live_photo_frame_processor_trampoline(json.as_ptr(), keep.as_ptr()) };
 
         assert_eq!(skipped, 1);
@@ -377,11 +382,14 @@ mod tests {
     #[test]
     fn trampoline_contains_callback_panics() {
         let json = frame_json();
-        let callback: Box<FrameProcessorCallback> = Box::new(|_frame| panic!("frame processor panic"));
+        let callback: Box<FrameProcessorCallback> =
+            Box::new(|_frame| panic!("frame processor panic"));
         let context = FrameProcessorContext::new(Mutex::new(callback));
 
-        let first = unsafe { live_photo_frame_processor_trampoline(json.as_ptr(), context.as_ptr()) };
-        let second = unsafe { live_photo_frame_processor_trampoline(json.as_ptr(), context.as_ptr()) };
+        let first =
+            unsafe { live_photo_frame_processor_trampoline(json.as_ptr(), context.as_ptr()) };
+        let second =
+            unsafe { live_photo_frame_processor_trampoline(json.as_ptr(), context.as_ptr()) };
 
         assert_eq!((first, second), (0, 0));
         assert!(context.is_active());

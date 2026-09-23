@@ -13,7 +13,8 @@ pub type ObserverContextCallback = extern "C" fn(user_info: *mut c_void);
 pub type LivePhotoFrameProcessorCallback =
     unsafe extern "C" fn(frame_json: *const c_char, user_info: *mut c_void) -> i32;
 pub type ContextCallback = unsafe extern "C" fn(context: *mut c_void);
-pub type DataChunkCallback = unsafe extern "C" fn(bytes: *const u8, len: usize, context: *mut c_void);
+pub type DataChunkCallback =
+    unsafe extern "C" fn(bytes: *const u8, len: usize, context: *mut c_void);
 pub type BoolJsonCallback = unsafe extern "C" fn(json: *mut c_char, user_info: *mut c_void) -> i32;
 
 pub mod asset;

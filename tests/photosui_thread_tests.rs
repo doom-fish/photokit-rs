@@ -24,6 +24,7 @@ fn live_photo_view_rejects_creation_off_the_main_thread() {
 
 #[test]
 fn picker_rejects_creation_off_the_main_thread() {
-    let message = off_main_thread(|| PHPickerViewController::new(&PHPickerConfiguration::new()).map(drop));
+    let message =
+        off_main_thread(|| PHPickerViewController::new(&PHPickerConfiguration::new()).map(drop));
     assert!(message.contains("main thread"), "{message}");
 }

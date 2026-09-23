@@ -70,12 +70,14 @@ fn asset_change_rejects_invalid_creation_date() {
 #[test]
 fn asset_collection_change_rejects_unknown_mutation_kind() {
     let mut request = PHAssetCollectionChangeRequest::creation_request_for_asset_collection("x");
-    request.asset_mutations.push(PHAssetCollectionAssetMutation {
-        kind: "shuffle".to_owned(),
-        asset_local_identifiers: Vec::new(),
-        indexes: Vec::new(),
-        to_index: None,
-    });
+    request
+        .asset_mutations
+        .push(PHAssetCollectionAssetMutation {
+            kind: "shuffle".to_owned(),
+            asset_local_identifiers: Vec::new(),
+            indexes: Vec::new(),
+            to_index: None,
+        });
     assert_rejected(request.perform(), "unsupported mutation kind");
 }
 
@@ -96,12 +98,14 @@ fn asset_collection_change_rejects_mismatched_insert_indexes() {
 #[test]
 fn asset_collection_change_rejects_move_without_destination() {
     let mut request = PHAssetCollectionChangeRequest::creation_request_for_asset_collection("x");
-    request.asset_mutations.push(PHAssetCollectionAssetMutation {
-        kind: "move".to_owned(),
-        asset_local_identifiers: Vec::new(),
-        indexes: Vec::new(),
-        to_index: None,
-    });
+    request
+        .asset_mutations
+        .push(PHAssetCollectionAssetMutation {
+            kind: "move".to_owned(),
+            asset_local_identifiers: Vec::new(),
+            indexes: Vec::new(),
+            to_index: None,
+        });
     assert_rejected(request.perform(), "move destination index");
 }
 
