@@ -119,6 +119,7 @@ pub struct PHProjectChangeRequest {
     pub title: Option<String>,
     /// Serialized field carried by `PHProjectChangeRequest`.
     pub project_extension_data_base64: Option<String>,
+    #[serde(rename = "projectPreviewImageFileURL")]
     /// Serialized field carried by `PHProjectChangeRequest`.
     pub project_preview_image_file_url: Option<String>,
     #[serde(default)]

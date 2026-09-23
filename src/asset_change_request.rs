@@ -20,10 +20,12 @@ struct PHChangeRequestPerformResult {
 pub struct PHAssetChangeRequest {
     /// Serialized field carried by `PHAssetChangeRequest`.
     pub asset_local_identifier: Option<String>,
+    #[serde(rename = "createImageFileURL")]
     /// Serialized field carried by `PHAssetChangeRequest`.
     pub create_image_file_url: Option<String>,
     /// Serialized field carried by `PHAssetChangeRequest`.
     pub create_image_data_base64: Option<String>,
+    #[serde(rename = "createVideoFileURL")]
     /// Serialized field carried by `PHAssetChangeRequest`.
     pub create_video_file_url: Option<String>,
     /// Serialized field carried by `PHAssetChangeRequest`.

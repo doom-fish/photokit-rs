@@ -283,8 +283,8 @@ pub struct PHVideoResult {
     #[serde(default)]
     /// Corresponds to `PHVideoResult.error`.
     pub error: Option<NSErrorInfo>,
-    #[serde(default)]
-    /// Corresponds to `PHVideoResult.assetUrl`.
+    #[serde(default, rename = "assetURL", alias = "assetUrl")]
+    /// Corresponds to `PHVideoResult.assetURL`.
     pub asset_url: Option<String>,
     #[serde(default)]
     /// Corresponds to `PHVideoResult.durationSeconds`.

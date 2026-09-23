@@ -83,7 +83,8 @@ pub struct PHContentEditingInputInfo {
     pub display_size_image_width: Option<f64>,
     /// Corresponds to `PHContentEditingInputInfo.displaySizeImageHeight`.
     pub display_size_image_height: Option<f64>,
-    /// Corresponds to `PHContentEditingInputInfo.fullSizeImageUrl`.
+    #[serde(rename = "fullSizeImageURL", alias = "fullSizeImageUrl")]
+    /// Corresponds to `PHContentEditingInputInfo.fullSizeImageURL`.
     pub full_size_image_url: Option<String>,
     /// Corresponds to `PHContentEditingInputInfo.fullSizeImageOrientation`.
     pub full_size_image_orientation: i32,

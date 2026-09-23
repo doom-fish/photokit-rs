@@ -15,7 +15,8 @@ use crate::private::{cstring_from_str, json_cstring, parse_json_ptr, take_string
 pub struct PHContentEditingOutputInfo {
     /// Corresponds to `PHContentEditingOutputInfo.adjustmentData`.
     pub adjustment_data: Option<PHAdjustmentData>,
-    /// Corresponds to `PHContentEditingOutputInfo.renderedContentUrl`.
+    #[serde(rename = "renderedContentURL", alias = "renderedContentUrl")]
+    /// Corresponds to `PHContentEditingOutputInfo.renderedContentURL`.
     pub rendered_content_url: String,
     /// Corresponds to `PHContentEditingOutputInfo.defaultRenderedContentTypeIdentifier`.
     pub default_rendered_content_type_identifier: Option<String>,

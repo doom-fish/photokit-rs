@@ -30,7 +30,8 @@ pub struct PHAssetResourceCreationOptions {
 pub struct PHAssetCreationResource {
     /// Corresponds to `PHAssetCreationResource.resourceType`.
     pub resource_type: PHAssetResourceType,
-    /// Corresponds to `PHAssetCreationResource.fileUrl`.
+    #[serde(rename = "fileURL")]
+    /// Corresponds to `PHAssetCreationResource.fileURL`.
     pub file_url: Option<String>,
     /// Corresponds to `PHAssetCreationResource.dataBase64`.
     pub data_base64: Option<String>,

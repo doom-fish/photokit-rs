@@ -42,7 +42,8 @@ impl PHAssetResourceDataResult {
 #[serde(rename_all = "camelCase")]
 /// Serialized result from `PHAssetResourceManager.writeData`.
 pub struct PHAssetResourceWriteResult {
-    /// Corresponds to `PHAssetResourceWriteResult.fileUrl`.
+    #[serde(rename = "fileURL", alias = "fileUrl")]
+    /// Corresponds to `PHAssetResourceWriteResult.fileURL`.
     pub file_url: String,
     /// Corresponds to `PHAssetResourceWriteResult.success`.
     pub success: bool,
