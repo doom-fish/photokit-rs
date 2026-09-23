@@ -1,6 +1,6 @@
 use core::ffi::{c_char, c_void};
 
-use super::LivePhotoFrameProcessorCallback;
+use super::{ContextCallback, LivePhotoFrameProcessorCallback};
 
 extern "C" {
     pub fn ph_live_photo_editing_context_new(
@@ -21,6 +21,8 @@ extern "C" {
         context: *mut c_void,
         callback: LivePhotoFrameProcessorCallback,
         user_info: *mut c_void,
+        context_retain: ContextCallback,
+        context_release: ContextCallback,
         out_error: *mut *mut c_char,
     ) -> i32;
     pub fn ph_live_photo_editing_context_clear_frame_processor(context: *mut c_void);

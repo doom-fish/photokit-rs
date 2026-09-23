@@ -2,8 +2,9 @@ use core::ffi::{c_char, c_void};
 use std::ffi::CStr;
 use std::ops::Deref;
 use std::ptr::{self, NonNull};
+use std::sync::{Mutex, PoisonError};
 
-use doom_fish_utils::panic_safe::catch_user_panic;
+use doom_fish_utils::callback_context::CallbackContext;
 use serde::{Deserialize, Serialize};
 
 use crate::content_editing_input::PHContentEditingInput;
@@ -15,6 +16,7 @@ use crate::private::parse_json_ptr;
 
 type FrameProcessorCallback =
     dyn FnMut(PHLivePhotoFrame) -> PHLivePhotoFrameProcessingDecision + Send;
+type FrameProcessorContext = CallbackContext<Mutex<Box<FrameProcessorCallback>>>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -86,7 +88,7 @@ pub struct PHLivePhotoEditingSaveResult {
 pub struct PHLivePhotoEditingContext {
     raw: NonNull<c_void>,
     info: PHLivePhotoEditingContextInfo,
-    frame_processor_user_info: Option<NonNull<c_void>>,
+    frame_processor: Option<FrameProcessorContext>,
 }
 
 impl PHLivePhotoEditingContext {
@@ -107,7 +109,7 @@ impl PHLivePhotoEditingContext {
                 audio_volume: 1.0,
                 orientation: 0,
             },
-            frame_processor_user_info: None,
+            frame_processor: None,
         };
         context.refresh_info()?;
         Ok(context)
@@ -142,51 +144,31 @@ impl PHLivePhotoEditingContext {
     {
         self.clear_frame_processor();
         let callback: Box<FrameProcessorCallback> = Box::new(callback);
-        // SAFETY: `Box::into_raw` never returns null, so `NonNull::new_unchecked` is safe.
-        let user_info =
-            unsafe { NonNull::new_unchecked(Box::into_raw(Box::new(callback)).cast::<c_void>()) };
+        let context = FrameProcessorContext::new(Mutex::new(callback));
         let mut error = ptr::null_mut();
-        // SAFETY: `self.raw` is a valid editing context pointer; the trampoline
-        // is a valid `extern "C"` fn; `user_info` is a live allocation managed
-        // by `self.frame_processor_user_info`.
         let status = unsafe {
             ffi::ph_live_photo_editing_context_set_frame_processor(
                 self.raw.as_ptr(),
                 live_photo_frame_processor_trampoline,
-                user_info.as_ptr(),
+                context.as_ptr(),
+                FrameProcessorContext::RETAIN,
+                FrameProcessorContext::RELEASE,
                 &mut error,
             )
         };
         if status == ffi::status::OK && error.is_null() {
-            self.frame_processor_user_info = Some(user_info);
+            self.frame_processor = Some(context);
             Ok(())
         } else {
-            // SAFETY: Setting the processor failed; `user_info` was never passed
-            // to the Swift bridge, so this is the only `from_raw` call on it.
-            unsafe {
-                drop(Box::from_raw(
-                    user_info.as_ptr().cast::<Box<FrameProcessorCallback>>(),
-                ));
-            }
-            // SAFETY: `error` is a non-null pointer set by the Swift bridge on failure.
             Err(unsafe { PhotoKitError::from_error_ptr(error, "set frame processor failed") })
         }
     }
 
     /// Clears Photos framework state on `PHLivePhotoEditingContext`.
     pub fn clear_frame_processor(&mut self) {
-        // SAFETY: `self.raw` is a valid editing context pointer.
-        unsafe { ffi::ph_live_photo_editing_context_clear_frame_processor(self.raw.as_ptr()) };
-        if let Some(user_info) = self.frame_processor_user_info.take() {
-            // SAFETY: `user_info` was created from `Box<Box<FrameProcessorCallback>>`
-            // via `Box::into_raw`.  After `clear_frame_processor` above the Swift
-            // bridge will no longer invoke the trampoline, so this is the only
-            // `from_raw` call on this pointer.
-            unsafe {
-                drop(Box::from_raw(
-                    user_info.as_ptr().cast::<Box<FrameProcessorCallback>>(),
-                ));
-            }
+        if let Some(context) = self.frame_processor.take() {
+            context.deactivate();
+            unsafe { ffi::ph_live_photo_editing_context_clear_frame_processor(self.raw.as_ptr()) };
         }
     }
 
@@ -290,24 +272,117 @@ unsafe extern "C" fn live_photo_frame_processor_trampoline(
     frame_json: *const c_char,
     user_info: *mut c_void,
 ) -> i32 {
-    if frame_json.is_null() || user_info.is_null() {
+    if frame_json.is_null() {
         return 0;
     }
 
-    // SAFETY: `frame_json` is a valid NUL-terminated C string from the Swift bridge.
-    let frame_json = CStr::from_ptr(frame_json).to_string_lossy();
-    let Ok(frame) = serde_json::from_str::<PHLivePhotoFrame>(&frame_json) else {
-        return 0;
-    };
-    // SAFETY: `user_info` is a `Box<Box<FrameProcessorCallback>>` kept alive by
-    // the `PHLivePhotoEditingContext` that owns this registration.
-    let callback = &mut **user_info.cast::<Box<FrameProcessorCallback>>();
-    let mut decision = 0i32;
-    catch_user_panic("live_photo_frame_processor_trampoline", || {
-        decision = match callback(frame) {
+    FrameProcessorContext::with(user_info, "live_photo_frame_processor_trampoline", |callback| {
+        let frame_json = CStr::from_ptr(frame_json).to_string_lossy();
+        let Ok(frame) = serde_json::from_str::<PHLivePhotoFrame>(&frame_json) else {
+            return 0;
+        };
+        let mut callback = callback.lock().unwrap_or_else(PoisonError::into_inner);
+        match callback(frame) {
             PHLivePhotoFrameProcessingDecision::KeepOriginal => 0,
             PHLivePhotoFrameProcessingDecision::SkipFrame => 1,
+        }
+    })
+    .unwrap_or(0)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::ffi::CString;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::{Arc, Mutex};
+
+    use super::{
+        live_photo_frame_processor_trampoline, FrameProcessorCallback, FrameProcessorContext,
+        PHLivePhotoFrame, PHLivePhotoFrameProcessingDecision, PHLivePhotoFrameType,
+    };
+
+    fn frame_json() -> CString {
+        CString::new(
+            r#"{"frameType":1,"timeSeconds":0.5,"renderScale":1.0,"imageWidth":4.0,"imageHeight":3.0}"#,
+        )
+        .unwrap()
+    }
+
+    fn processor(
+        decision: PHLivePhotoFrameProcessingDecision,
+        calls: &Arc<AtomicUsize>,
+    ) -> FrameProcessorContext {
+        let calls = Arc::clone(calls);
+        let callback: Box<FrameProcessorCallback> = Box::new(move |frame: PHLivePhotoFrame| {
+            assert_eq!(frame.frame_type, PHLivePhotoFrameType::VIDEO);
+            calls.fetch_add(1, Ordering::SeqCst);
+            decision
+        });
+        FrameProcessorContext::new(Mutex::new(callback))
+    }
+
+    #[test]
+    fn trampoline_forwards_decisions_while_active() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let json = frame_json();
+        let skip = processor(PHLivePhotoFrameProcessingDecision::SkipFrame, &calls);
+        let keep = processor(PHLivePhotoFrameProcessingDecision::KeepOriginal, &calls);
+
+        let skipped = unsafe { live_photo_frame_processor_trampoline(json.as_ptr(), skip.as_ptr()) };
+        let kept = unsafe { live_photo_frame_processor_trampoline(json.as_ptr(), keep.as_ptr()) };
+
+        assert_eq!(skipped, 1);
+        assert_eq!(kept, 0);
+        assert_eq!(calls.load(Ordering::SeqCst), 2);
+    }
+
+    #[test]
+    fn in_flight_render_after_clear_neither_runs_nor_frees_the_callback() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let json = frame_json();
+        let context = processor(PHLivePhotoFrameProcessingDecision::SkipFrame, &calls);
+        let block_copy = context.retained_ptr();
+
+        drop(context);
+        assert_eq!(Arc::strong_count(&calls), 2);
+
+        let decision = unsafe { live_photo_frame_processor_trampoline(json.as_ptr(), block_copy) };
+        assert_eq!(decision, 0);
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+
+        unsafe { (FrameProcessorContext::RELEASE)(block_copy) };
+        assert_eq!(Arc::strong_count(&calls), 1);
+    }
+
+    #[test]
+    fn trampoline_ignores_null_and_malformed_input() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let context = processor(PHLivePhotoFrameProcessingDecision::SkipFrame, &calls);
+        let malformed = CString::new("{not json").unwrap();
+        let json = frame_json();
+
+        let results = unsafe {
+            [
+                live_photo_frame_processor_trampoline(std::ptr::null(), context.as_ptr()),
+                live_photo_frame_processor_trampoline(json.as_ptr(), std::ptr::null_mut()),
+                live_photo_frame_processor_trampoline(malformed.as_ptr(), context.as_ptr()),
+            ]
         };
-    });
-    decision
+
+        assert_eq!(results, [0, 0, 0]);
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn trampoline_contains_callback_panics() {
+        let json = frame_json();
+        let callback: Box<FrameProcessorCallback> = Box::new(|_frame| panic!("frame processor panic"));
+        let context = FrameProcessorContext::new(Mutex::new(callback));
+
+        let first = unsafe { live_photo_frame_processor_trampoline(json.as_ptr(), context.as_ptr()) };
+        let second = unsafe { live_photo_frame_processor_trampoline(json.as_ptr(), context.as_ptr()) };
+
+        assert_eq!((first, second), (0, 0));
+        assert!(context.is_active());
+    }
 }

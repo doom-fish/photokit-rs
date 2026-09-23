@@ -4,6 +4,35 @@ import Photos
 
 public typealias PKRLivePhotoFrameProcessorCallback = @convention(c) (UnsafePointer<CChar>?, UnsafeMutableRawPointer?) -> Int32
 
+final class PKRLivePhotoFrameProcessor {
+    private let callback: PKRLivePhotoFrameProcessorCallback
+    private let userInfo: UnsafeMutableRawPointer
+    private let contextRelease: PKRObserverContextCallback
+
+    init(
+        callback: @escaping PKRLivePhotoFrameProcessorCallback,
+        userInfo: UnsafeMutableRawPointer,
+        contextRetain: PKRObserverContextCallback,
+        contextRelease: @escaping PKRObserverContextCallback
+    ) {
+        self.callback = callback
+        self.userInfo = userInfo
+        self.contextRelease = contextRelease
+        contextRetain(userInfo)
+    }
+
+    deinit {
+        contextRelease(userInfo)
+    }
+
+    func process(_ frame: PHLivePhotoFrame) -> CIImage? {
+        guard let json = try? pkrEncodeJSON(pkrEncodeLivePhotoFrame(frame)) else {
+            return frame.image
+        }
+        return json.withCString { callback($0, userInfo) } == 1 ? nil : frame.image
+    }
+}
+
 final class PKRLivePhotoEditingContextBox: NSObject {
     let context: PHLivePhotoEditingContext
 
@@ -65,7 +94,7 @@ public func ph_live_photo_editing_context_new(
         return nil
     }
     do {
-        let livePhotoInput = pkrBorrow(input, as: PHContentEditingInput.self)
+        let livePhotoInput = pkrBorrow(input, as: PKRContentEditingInputBox.self).input
         guard let context = PHLivePhotoEditingContext(livePhotoEditingInput: livePhotoInput) else {
             throw NSError(domain: "photokit-rs", code: -1, userInfo: [NSLocalizedDescriptionKey: "content editing input is not for a live photo"])
         }
@@ -120,24 +149,27 @@ public func ph_live_photo_editing_context_set_frame_processor(
     _ context: UnsafeMutableRawPointer?,
     _ callback: @escaping PKRLivePhotoFrameProcessorCallback,
     _ userInfo: UnsafeMutableRawPointer?,
+    _ contextRetain: @escaping PKRObserverContextCallback,
+    _ contextRelease: @escaping PKRObserverContextCallback,
     _ outError: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> Int32 {
     guard let context else {
         pkrSetMessageError(outError, message: "missing PHLivePhotoEditingContext")
         return PKR_ERROR
     }
+    guard let userInfo else {
+        pkrSetMessageError(outError, message: "missing frame processor context")
+        return PKR_ERROR
+    }
     let editingContext = pkrBorrow(context, as: PKRLivePhotoEditingContextBox.self).context
+    let processor = PKRLivePhotoFrameProcessor(
+        callback: callback,
+        userInfo: userInfo,
+        contextRetain: contextRetain,
+        contextRelease: contextRelease
+    )
     editingContext.frameProcessor = { frame, _ in
-        guard let json = try? pkrEncodeJSON(pkrEncodeLivePhotoFrame(frame)) else {
-            return frame.image
-        }
-        let decision = json.withCString { callback($0, userInfo) }
-        switch decision {
-        case 1:
-            return nil
-        default:
-            return frame.image
-        }
+        processor.process(frame)
     }
     return PKR_OK
 }

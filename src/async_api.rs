@@ -36,6 +36,7 @@
 
 use std::ffi::{c_void, CStr};
 use std::future::Future;
+use std::marker::PhantomData;
 use std::pin::Pin;
 use std::ptr::NonNull;
 use std::task::{Context, Poll};
@@ -194,18 +195,19 @@ define_json_callback!(live_photo_save_callback, PHLivePhotoEditingSaveResult);
 define_json_callback!(live_photo_prepare_callback, PHLivePhotoResult);
 
 /// Future for [`AsyncPHLivePhotoEditingContext::save_live_photo`].
-pub struct SaveLivePhotoFuture {
+pub struct SaveLivePhotoFuture<'a> {
     inner: AsyncCompletionFuture<PHLivePhotoEditingSaveResult>,
+    borrow: PhantomData<&'a ()>,
 }
 
-impl core::fmt::Debug for SaveLivePhotoFuture {
+impl core::fmt::Debug for SaveLivePhotoFuture<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("SaveLivePhotoFuture")
             .finish_non_exhaustive()
     }
 }
 
-impl Future for SaveLivePhotoFuture {
+impl Future for SaveLivePhotoFuture<'_> {
     type Output = Result<PHLivePhotoEditingSaveResult, PhotoKitError>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -216,18 +218,19 @@ impl Future for SaveLivePhotoFuture {
 }
 
 /// Future for [`AsyncPHLivePhotoEditingContext::prepare_live_photo`].
-pub struct PrepareLivePhotoFuture {
+pub struct PrepareLivePhotoFuture<'a> {
     inner: AsyncCompletionFuture<PHLivePhotoResult>,
+    borrow: PhantomData<&'a ()>,
 }
 
-impl core::fmt::Debug for PrepareLivePhotoFuture {
+impl core::fmt::Debug for PrepareLivePhotoFuture<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("PrepareLivePhotoFuture")
             .finish_non_exhaustive()
     }
 }
 
-impl Future for PrepareLivePhotoFuture {
+impl Future for PrepareLivePhotoFuture<'_> {
     type Output = Result<PHLivePhotoResult, PhotoKitError>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -412,10 +415,10 @@ pub struct AsyncPHLivePhotoEditingContext;
 
 impl AsyncPHLivePhotoEditingContext {
     /// Asynchronously save a live photo to `output`.
-    pub fn save_live_photo(
-        context: &PHLivePhotoEditingContext,
-        output: &PHContentEditingOutput,
-    ) -> SaveLivePhotoFuture {
+    pub fn save_live_photo<'a>(
+        context: &'a PHLivePhotoEditingContext,
+        output: &'a PHContentEditingOutput,
+    ) -> SaveLivePhotoFuture<'a> {
         let (future, ctx) = AsyncCompletion::create();
         unsafe {
             crate::ffi::ph_live_photo_editing_context_save_async(
@@ -425,7 +428,10 @@ impl AsyncPHLivePhotoEditingContext {
                 ctx,
             );
         }
-        SaveLivePhotoFuture { inner: future }
+        SaveLivePhotoFuture {
+            inner: future,
+            borrow: PhantomData,
+        }
     }
 
     /// Asynchronously prepare a live photo for playback at the given target size.
@@ -433,7 +439,7 @@ impl AsyncPHLivePhotoEditingContext {
         context: &PHLivePhotoEditingContext,
         target_width: f64,
         target_height: f64,
-    ) -> PrepareLivePhotoFuture {
+    ) -> PrepareLivePhotoFuture<'_> {
         let (future, ctx) = AsyncCompletion::create();
         unsafe {
             crate::ffi::ph_live_photo_editing_context_prepare_async(
@@ -444,6 +450,9 @@ impl AsyncPHLivePhotoEditingContext {
                 ctx,
             );
         }
-        PrepareLivePhotoFuture { inner: future }
+        PrepareLivePhotoFuture {
+            inner: future,
+            borrow: PhantomData,
+        }
     }
 }

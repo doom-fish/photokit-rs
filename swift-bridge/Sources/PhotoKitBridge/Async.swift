@@ -297,19 +297,21 @@ public func ph_live_photo_editing_context_save_async(
         return
     }
 
-    let editingContext = pkrBorrow(context, as: PKRLivePhotoEditingContextBox.self).context
-    let editingOutput = pkrBorrow(output, as: PHContentEditingOutput.self)
-    editingContext.saveLivePhoto(to: editingOutput, options: nil) { success, error in
-        if let error {
-            error.localizedDescription.withCString { cb(nil, $0, ctx) }
-            return
-        }
+    let contextBox = pkrBorrow(context, as: PKRLivePhotoEditingContextBox.self)
+    let outputBox = pkrBorrow(output, as: PKRContentEditingOutputBox.self)
+    contextBox.context.saveLivePhoto(to: outputBox.output, options: nil) { success, error in
+        withExtendedLifetime((contextBox, outputBox)) {
+            if let error {
+                error.localizedDescription.withCString { cb(nil, $0, ctx) }
+                return
+            }
 
-        let payload = PKRLivePhotoEditingSaveResultPayload(success: success)
-        if let json = try? pkrEncodeJSON(payload) {
-            json.withCString { cb($0, nil, ctx) }
-        } else {
-            "encode failed".withCString { cb(nil, $0, ctx) }
+            let payload = PKRLivePhotoEditingSaveResultPayload(success: success)
+            if let json = try? pkrEncodeJSON(payload) {
+                json.withCString { cb($0, nil, ctx) }
+            } else {
+                "encode failed".withCString { cb(nil, $0, ctx) }
+            }
         }
     }
 }
@@ -327,29 +329,31 @@ public func ph_live_photo_editing_context_prepare_async(
         return
     }
 
-    let editingContext = pkrBorrow(context, as: PKRLivePhotoEditingContextBox.self).context
-    editingContext.prepareLivePhotoForPlayback(
+    let contextBox = pkrBorrow(context, as: PKRLivePhotoEditingContextBox.self)
+    contextBox.context.prepareLivePhotoForPlayback(
         withTargetSize: CGSize(width: targetWidth, height: targetHeight),
         options: nil
     ) { livePhoto, error in
-        if let error {
-            error.localizedDescription.withCString { cb(nil, $0, ctx) }
-            return
-        }
+        withExtendedLifetime(contextBox) {
+            if let error {
+                error.localizedDescription.withCString { cb(nil, $0, ctx) }
+                return
+            }
 
-        let payload = PKRLivePhotoResultPayload(
-            hasLivePhoto: livePhoto != nil,
-            cancelled: false,
-            degraded: false,
-            sizeWidth: Double(livePhoto?.size.width ?? 0),
-            sizeHeight: Double(livePhoto?.size.height ?? 0),
-            requestID: nil,
-            error: nil
-        )
-        if let json = try? pkrEncodeJSON(payload) {
-            json.withCString { cb($0, nil, ctx) }
-        } else {
-            "encode failed".withCString { cb(nil, $0, ctx) }
+            let payload = PKRLivePhotoResultPayload(
+                hasLivePhoto: livePhoto != nil,
+                cancelled: false,
+                degraded: false,
+                sizeWidth: Double(livePhoto?.size.width ?? 0),
+                sizeHeight: Double(livePhoto?.size.height ?? 0),
+                requestID: nil,
+                error: nil
+            )
+            if let json = try? pkrEncodeJSON(payload) {
+                json.withCString { cb($0, nil, ctx) }
+            } else {
+                "encode failed".withCString { cb(nil, $0, ctx) }
+            }
         }
     }
 }
