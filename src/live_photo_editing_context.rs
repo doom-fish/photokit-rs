@@ -95,7 +95,8 @@ impl PHLivePhotoEditingContext {
     /// Creates a helper value for the related Photos framework API.
     pub fn new(input: &PHContentEditingInput) -> Result<Self, PhotoKitError> {
         let mut error = ptr::null_mut();
-        let raw = unsafe { ffi::ph_live_photo_editing_context_new(input.raw.as_ptr(), &mut error) };
+        let raw =
+            unsafe { ffi::ph_live_photo_editing_context_new(input.raw.as_ptr(), &raw mut error) };
         let raw = NonNull::new(raw).ok_or_else(|| unsafe {
             PhotoKitError::from_error_ptr(error, "create live photo editing context failed")
         })?;
@@ -127,7 +128,7 @@ impl PHLivePhotoEditingContext {
             ffi::ph_live_photo_editing_context_set_audio_volume(
                 self.raw.as_ptr(),
                 audio_volume,
-                &mut error,
+                &raw mut error,
             )
         };
         if status == ffi::status::OK && error.is_null() {
@@ -153,7 +154,7 @@ impl PHLivePhotoEditingContext {
                 context.as_ptr(),
                 FrameProcessorContext::RETAIN,
                 FrameProcessorContext::RELEASE,
-                &mut error,
+                &raw mut error,
             )
         };
         if status == ffi::status::OK && error.is_null() {
@@ -186,7 +187,7 @@ impl PHLivePhotoEditingContext {
                 target_width,
                 target_height,
                 timeout_ms,
-                &mut error,
+                &raw mut error,
             )
         };
         if payload.is_null() {
@@ -210,7 +211,7 @@ impl PHLivePhotoEditingContext {
                 self.raw.as_ptr(),
                 output.as_raw(),
                 timeout_ms,
-                &mut error,
+                &raw mut error,
             )
         };
         if payload.is_null() {
@@ -233,7 +234,7 @@ impl PHLivePhotoEditingContext {
     fn refresh_info(&mut self) -> Result<(), PhotoKitError> {
         let mut error = ptr::null_mut();
         let payload =
-            unsafe { ffi::ph_live_photo_editing_context_json(self.raw.as_ptr(), &mut error) };
+            unsafe { ffi::ph_live_photo_editing_context_json(self.raw.as_ptr(), &raw mut error) };
         if payload.is_null() {
             Err(unsafe {
                 PhotoKitError::from_error_ptr(error, "live photo context snapshot failed")

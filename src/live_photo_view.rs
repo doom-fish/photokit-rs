@@ -94,7 +94,7 @@ impl PHLivePhotoView {
     /// Creates a new `PHLivePhotoView`.
     pub fn new() -> Result<Self, PhotoKitError> {
         let mut error = ptr::null_mut();
-        let raw = unsafe { ffi::ph_live_photo_view_new(&mut error) };
+        let raw = unsafe { ffi::ph_live_photo_view_new(&raw mut error) };
         let raw = NonNull::new(raw).ok_or_else(|| unsafe {
             PhotoKitError::from_error_ptr(error, "create PHLivePhotoView failed")
         })?;
@@ -104,7 +104,7 @@ impl PHLivePhotoView {
     /// Returns a PhotosUI snapshot of the view state.
     pub fn snapshot(&self) -> Result<PHLivePhotoViewInfo, PhotoKitError> {
         let mut error = ptr::null_mut();
-        let payload = unsafe { ffi::ph_live_photo_view_json(self.raw.as_ptr(), &mut error) };
+        let payload = unsafe { ffi::ph_live_photo_view_json(self.raw.as_ptr(), &raw mut error) };
         if payload.is_null() {
             Err(unsafe { PhotoKitError::from_error_ptr(error, "PHLivePhotoView snapshot failed") })
         } else {
@@ -125,7 +125,7 @@ impl PHLivePhotoView {
                     PHLivePhotoViewContentMode::AspectFit => 0,
                     PHLivePhotoViewContentMode::AspectFill => 1,
                 },
-                &mut error,
+                &raw mut error,
             )
         };
         if status == ffi::status::OK && error.is_null() {
@@ -143,7 +143,7 @@ impl PHLivePhotoView {
             ffi::ph_live_photo_view_set_contents_rect_json(
                 self.raw.as_ptr(),
                 rect_json.as_ptr(),
-                &mut error,
+                &raw mut error,
             )
         };
         if status == ffi::status::OK && error.is_null() {
@@ -157,7 +157,11 @@ impl PHLivePhotoView {
     pub fn set_audio_volume(&mut self, audio_volume: f32) -> Result<(), PhotoKitError> {
         let mut error = ptr::null_mut();
         let status = unsafe {
-            ffi::ph_live_photo_view_set_audio_volume(self.raw.as_ptr(), audio_volume, &mut error)
+            ffi::ph_live_photo_view_set_audio_volume(
+                self.raw.as_ptr(),
+                audio_volume,
+                &raw mut error,
+            )
         };
         if status == ffi::status::OK && error.is_null() {
             Ok(())
@@ -169,9 +173,8 @@ impl PHLivePhotoView {
     /// Updates `muted`.
     pub fn set_muted(&mut self, muted: bool) -> Result<(), PhotoKitError> {
         let mut error = ptr::null_mut();
-        let status = unsafe {
-            ffi::ph_live_photo_view_set_muted(self.raw.as_ptr(), muted, &mut error)
-        };
+        let status =
+            unsafe { ffi::ph_live_photo_view_set_muted(self.raw.as_ptr(), muted, &raw mut error) };
         if status == ffi::status::OK && error.is_null() {
             Ok(())
         } else {
@@ -182,9 +185,8 @@ impl PHLivePhotoView {
     /// Clears the live photo displayed by the view.
     pub fn clear_live_photo(&mut self) -> Result<(), PhotoKitError> {
         let mut error = ptr::null_mut();
-        let status = unsafe {
-            ffi::ph_live_photo_view_clear_live_photo(self.raw.as_ptr(), &mut error)
-        };
+        let status =
+            unsafe { ffi::ph_live_photo_view_clear_live_photo(self.raw.as_ptr(), &raw mut error) };
         if status == ffi::status::OK && error.is_null() {
             Ok(())
         } else {
@@ -208,7 +210,7 @@ impl PHLivePhotoView {
                 file_urls_json.as_ptr(),
                 request_json.as_ptr(),
                 timeout_ms,
-                &mut error,
+                &raw mut error,
             )
         };
         if payload.is_null() {
@@ -234,7 +236,7 @@ impl PHLivePhotoView {
                     PHLivePhotoViewPlaybackStyle::Full => 1,
                     PHLivePhotoViewPlaybackStyle::Hint => 2,
                 },
-                &mut error,
+                &raw mut error,
             )
         };
         if status == ffi::status::OK && error.is_null() {
@@ -247,7 +249,8 @@ impl PHLivePhotoView {
     /// Stops playback immediately.
     pub fn stop_playback(&self) -> Result<(), PhotoKitError> {
         let mut error = ptr::null_mut();
-        let status = unsafe { ffi::ph_live_photo_view_stop_playback(self.raw.as_ptr(), &mut error) };
+        let status =
+            unsafe { ffi::ph_live_photo_view_stop_playback(self.raw.as_ptr(), &raw mut error) };
         if status == ffi::status::OK && error.is_null() {
             Ok(())
         } else {
@@ -259,7 +262,11 @@ impl PHLivePhotoView {
     pub fn stop_playback_animated(&self, animated: bool) -> Result<(), PhotoKitError> {
         let mut error = ptr::null_mut();
         let status = unsafe {
-            ffi::ph_live_photo_view_stop_playback_animated(self.raw.as_ptr(), animated, &mut error)
+            ffi::ph_live_photo_view_stop_playback_animated(
+                self.raw.as_ptr(),
+                animated,
+                &raw mut error,
+            )
         };
         if status == ffi::status::OK && error.is_null() {
             Ok(())
@@ -290,7 +297,7 @@ impl PHLivePhotoView {
                 self.raw.as_ptr(),
                 live_photo_view_delegate_trampoline,
                 user_info.as_ptr(),
-                &mut error,
+                &raw mut error,
             )
         };
         if let Some(raw) = NonNull::new(raw) {

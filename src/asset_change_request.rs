@@ -135,7 +135,10 @@ impl PHAssetChangeRequest {
         let identifiers_json = json_cstring(&identifiers, "asset identifiers")?;
         let mut error = core::ptr::null_mut();
         let status = unsafe {
-            ffi::ph_asset_change_request_delete_assets_json(identifiers_json.as_ptr(), &mut error)
+            ffi::ph_asset_change_request_delete_assets_json(
+                identifiers_json.as_ptr(),
+                &raw mut error,
+            )
         };
         if status == ffi::status::OK && error.is_null() {
             Ok(())
@@ -151,8 +154,9 @@ impl PHChangeRequest for PHAssetChangeRequest {
     fn perform(self) -> Result<Self::Output, PhotoKitError> {
         let payload_json = json_cstring(&self, "PHAssetChangeRequest")?;
         let mut error = core::ptr::null_mut();
-        let payload =
-            unsafe { ffi::ph_asset_change_request_perform_json(payload_json.as_ptr(), &mut error) };
+        let payload = unsafe {
+            ffi::ph_asset_change_request_perform_json(payload_json.as_ptr(), &raw mut error)
+        };
         if payload.is_null() {
             Err(unsafe { PhotoKitError::from_error_ptr(error, "asset change request failed") })
         } else {

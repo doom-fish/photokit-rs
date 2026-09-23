@@ -39,7 +39,7 @@ impl PHContentEditingOutput {
             )
         })?;
         let mut error = ptr::null_mut();
-        let payload = ffi::ph_content_editing_output_json(raw.as_ptr(), &mut error);
+        let payload = ffi::ph_content_editing_output_json(raw.as_ptr(), &raw mut error);
         if payload.is_null() {
             Err(PhotoKitError::from_error_ptr(
                 error,
@@ -72,13 +72,13 @@ impl PHContentEditingOutput {
                 adjustment_json
                     .as_ref()
                     .map_or(ptr::null(), |value| value.as_c_str().as_ptr()),
-                &mut error,
+                &raw mut error,
             )
         };
         if status == ffi::status::OK && error.is_null() {
             let mut refresh_error = ptr::null_mut();
             let payload = unsafe {
-                ffi::ph_content_editing_output_json(self.raw.as_ptr(), &mut refresh_error)
+                ffi::ph_content_editing_output_json(self.raw.as_ptr(), &raw mut refresh_error)
             };
             if payload.is_null() {
                 Err(unsafe {
@@ -117,7 +117,7 @@ impl PHContentEditingOutput {
             ffi::ph_content_editing_output_rendered_content_url_for_type(
                 self.raw.as_ptr(),
                 type_identifier.as_ptr(),
-                &mut error,
+                &raw mut error,
             )
         };
         if payload.is_null() {
@@ -158,8 +158,9 @@ impl PHContentEditingInput {
     /// Wraps a Photos framework operation on `PHContentEditingInput`.
     pub fn create_content_editing_output(&self) -> Result<PHContentEditingOutput, PhotoKitError> {
         let mut error = ptr::null_mut();
-        let raw =
-            unsafe { ffi::ph_content_editing_output_new_for_input(self.raw.as_ptr(), &mut error) };
+        let raw = unsafe {
+            ffi::ph_content_editing_output_new_for_input(self.raw.as_ptr(), &raw mut error)
+        };
         if raw.is_null() {
             Err(unsafe {
                 PhotoKitError::from_error_ptr(error, "create content editing output failed")

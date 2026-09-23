@@ -338,7 +338,7 @@ impl PHImageManager {
                 self.raw.as_ptr(),
                 asset_identifier.as_ptr(),
                 request_json.as_ptr(),
-                &mut error,
+                &raw mut error,
             )
         };
         NonNull::new(raw)
@@ -360,7 +360,7 @@ impl PHImageManager {
                 self.raw.as_ptr(),
                 asset_identifier.as_ptr(),
                 request_json.as_ptr(),
-                &mut error,
+                &raw mut error,
             )
         };
         NonNull::new(raw)
@@ -384,7 +384,7 @@ impl PHImageManager {
                 self.raw.as_ptr(),
                 asset_identifier.as_ptr(),
                 request_json.as_ptr(),
-                &mut error,
+                &raw mut error,
             )
         };
         NonNull::new(raw)
@@ -429,7 +429,7 @@ impl PHImageManager {
                 options_json.as_ptr(),
                 export_preset.as_ptr(),
                 timeout_ms,
-                &mut error,
+                &raw mut error,
             )
         };
         if payload.is_null() {
@@ -481,7 +481,7 @@ impl PHImageManager {
                 asset_identifier.as_ptr(),
                 options_json.as_ptr(),
                 timeout_ms,
-                &mut error,
+                &raw mut error,
             )
         };
         if payload.is_null() {
@@ -532,7 +532,7 @@ impl PHCachingImageManager {
                 self.raw.as_ptr(),
                 identifiers_json.as_ptr(),
                 request_json.as_ptr(),
-                &mut error,
+                &raw mut error,
             )
         };
         if status == ffi::status::OK && error.is_null() {
@@ -560,7 +560,7 @@ impl PHCachingImageManager {
                 self.raw.as_ptr(),
                 identifiers_json.as_ptr(),
                 request_json.as_ptr(),
-                &mut error,
+                &raw mut error,
             )
         };
         if status == ffi::status::OK && error.is_null() {
@@ -660,7 +660,8 @@ fn wait_for_request<T: serde::de::DeserializeOwned>(
     context: &str,
 ) -> Result<T, PhotoKitError> {
     let mut error = ptr::null_mut();
-    let payload = unsafe { ffi::ph_image_request_wait_json(raw.as_ptr(), timeout_ms, &mut error) };
+    let payload =
+        unsafe { ffi::ph_image_request_wait_json(raw.as_ptr(), timeout_ms, &raw mut error) };
     if payload.is_null() {
         Err(unsafe { PhotoKitError::from_error_ptr(error, "request wait failed") })
     } else {

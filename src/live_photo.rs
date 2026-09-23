@@ -71,7 +71,7 @@ impl PHLivePhoto {
             ffi::ph_live_photo_request_with_resource_file_urls(
                 file_urls_json.as_ptr(),
                 request_json.as_ptr(),
-                &mut error,
+                &raw mut error,
             )
         };
         NonNull::new(raw)

@@ -179,8 +179,9 @@ impl PHAssetCollection {
     pub fn fetch(fetch_options: &PHFetchOptions) -> Result<PHFetchResult<Self>, PhotoKitError> {
         let options_json = json_cstring(fetch_options, "PHFetchOptions")?;
         let mut error = ptr::null_mut();
-        let payload =
-            unsafe { ffi::ph_asset_collection_fetch_all_json(options_json.as_ptr(), &mut error) };
+        let payload = unsafe {
+            ffi::ph_asset_collection_fetch_all_json(options_json.as_ptr(), &raw mut error)
+        };
         if payload.is_null() {
             Err(unsafe { PhotoKitError::from_error_ptr(error, "fetch asset collections failed") })
         } else {
@@ -207,7 +208,7 @@ impl PHAssetCollection {
                 },
                 collection_subtype.raw_value(),
                 options_json.as_ptr(),
-                &mut error,
+                &raw mut error,
             )
         };
         if payload.is_null() {
@@ -233,7 +234,7 @@ impl PHAssetCollection {
             ffi::ph_asset_collection_fetch_with_local_identifiers_json(
                 identifiers_json.as_ptr(),
                 options_json.as_ptr(),
-                &mut error,
+                &raw mut error,
             )
         };
         if payload.is_null() {
@@ -267,7 +268,7 @@ impl PHAssetCollection {
                     PHAssetCollectionType::SmartAlbum => 2,
                 },
                 options_json.as_ptr(),
-                &mut error,
+                &raw mut error,
             )
         };
         if payload.is_null() {
@@ -307,7 +308,7 @@ impl PHAssetCollection {
             ffi::ph_asset_collection_can_perform_edit_operation(
                 collection_identifier.as_ptr(),
                 edit_operation.as_raw(),
-                &mut error,
+                &raw mut error,
             )
         };
         if error.is_null() {

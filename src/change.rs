@@ -32,7 +32,7 @@ impl PHChange {
             ffi::ph_change_asset_change_details_json(
                 self.raw.as_ptr(),
                 asset_identifier.as_ptr(),
-                &mut error,
+                &raw mut error,
             )
         };
         if payload.is_null() {
@@ -56,7 +56,7 @@ impl PHChange {
             ffi::ph_change_asset_collection_change_details_json(
                 self.raw.as_ptr(),
                 collection_identifier.as_ptr(),
-                &mut error,
+                &raw mut error,
             )
         };
         if payload.is_null() {
@@ -82,7 +82,7 @@ impl PHChange {
             ffi::ph_change_collection_list_change_details_json(
                 self.raw.as_ptr(),
                 collection_identifier.as_ptr(),
-                &mut error,
+                &raw mut error,
             )
         };
         if payload.is_null() {

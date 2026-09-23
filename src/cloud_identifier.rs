@@ -71,7 +71,7 @@ impl PHPhotoLibrary {
             ffi::ph_photo_library_cloud_identifier_mappings_json(
                 self.raw.as_ptr(),
                 identifiers_json.as_ptr(),
-                &mut error,
+                &raw mut error,
             )
         };
         if payload.is_null() {
@@ -99,7 +99,7 @@ impl PHPhotoLibrary {
             ffi::ph_photo_library_local_identifier_mappings_json(
                 self.raw.as_ptr(),
                 identifiers_json.as_ptr(),
-                &mut error,
+                &raw mut error,
             )
         };
         if payload.is_null() {

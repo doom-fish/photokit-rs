@@ -83,7 +83,7 @@ impl PHAssetResourceManager {
                 sink.as_ptr(),
                 ResourceDataSink::RETAIN,
                 ResourceDataSink::RELEASE,
-                &mut error,
+                &raw mut error,
             )
         };
         if payload.is_null() {
@@ -119,7 +119,7 @@ impl PHAssetResourceManager {
                 file_url.as_ptr(),
                 options_json.as_ptr(),
                 timeout_ms,
-                &mut error,
+                &raw mut error,
             )
         };
         if payload.is_null() {

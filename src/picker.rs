@@ -264,9 +264,8 @@ impl PHPickerFilter {
     pub fn description(&self) -> Result<String, PhotoKitError> {
         let filter_json = json_cstring(self, "PHPickerFilter")?;
         let mut error = ptr::null_mut();
-        let payload = unsafe {
-            ffi::ph_picker_filter_description_json(filter_json.as_ptr(), &mut error)
-        };
+        let payload =
+            unsafe { ffi::ph_picker_filter_description_json(filter_json.as_ptr(), &raw mut error) };
         if payload.is_null() {
             Err(unsafe { PhotoKitError::from_error_ptr(error, "picker filter description failed") })
         } else {
@@ -509,7 +508,7 @@ impl PHPickerViewController {
             ffi::ph_picker_view_controller_new(
                 configuration_json.as_ptr(),
                 photo_library.map_or(ptr::null_mut(), |value| value.raw.as_ptr()),
-                &mut error,
+                &raw mut error,
             )
         };
         let raw = NonNull::new(raw).ok_or_else(|| unsafe {
@@ -537,7 +536,7 @@ impl PHPickerViewController {
             ffi::ph_picker_view_controller_update_picker_json(
                 self.raw.as_ptr(),
                 configuration_json.as_ptr(),
-                &mut error,
+                &raw mut error,
             )
         };
         if status == ffi::status::OK && error.is_null() {
@@ -560,7 +559,7 @@ impl PHPickerViewController {
             ffi::ph_picker_view_controller_deselect_assets_json(
                 self.raw.as_ptr(),
                 identifiers_json.as_ptr(),
-                &mut error,
+                &raw mut error,
             )
         };
         if status == ffi::status::OK && error.is_null() {
@@ -588,7 +587,7 @@ impl PHPickerViewController {
                 after_identifier
                     .as_ref()
                     .map_or(ptr::null(), |value| value.as_ptr()),
-                &mut error,
+                &raw mut error,
             )
         };
         if status == ffi::status::OK && error.is_null() {
@@ -601,8 +600,12 @@ impl PHPickerViewController {
     /// Scrolls the picker back to its initial position.
     pub fn scroll_to_initial_position(&self) -> Result<(), PhotoKitError> {
         let mut error = ptr::null_mut();
-        let status =
-            unsafe { ffi::ph_picker_view_controller_scroll_to_initial_position(self.raw.as_ptr(), &mut error) };
+        let status = unsafe {
+            ffi::ph_picker_view_controller_scroll_to_initial_position(
+                self.raw.as_ptr(),
+                &raw mut error,
+            )
+        };
         if status == ffi::status::OK && error.is_null() {
             Ok(())
         } else {
@@ -615,7 +618,8 @@ impl PHPickerViewController {
     /// Requests the picker to zoom in if possible.
     pub fn zoom_in(&self) -> Result<(), PhotoKitError> {
         let mut error = ptr::null_mut();
-        let status = unsafe { ffi::ph_picker_view_controller_zoom_in(self.raw.as_ptr(), &mut error) };
+        let status =
+            unsafe { ffi::ph_picker_view_controller_zoom_in(self.raw.as_ptr(), &raw mut error) };
         if status == ffi::status::OK && error.is_null() {
             Ok(())
         } else {
@@ -626,7 +630,8 @@ impl PHPickerViewController {
     /// Requests the picker to zoom out if possible.
     pub fn zoom_out(&self) -> Result<(), PhotoKitError> {
         let mut error = ptr::null_mut();
-        let status = unsafe { ffi::ph_picker_view_controller_zoom_out(self.raw.as_ptr(), &mut error) };
+        let status =
+            unsafe { ffi::ph_picker_view_controller_zoom_out(self.raw.as_ptr(), &raw mut error) };
         if status == ffi::status::OK && error.is_null() {
             Ok(())
         } else {
@@ -654,7 +659,7 @@ impl PHPickerViewController {
                 self.raw.as_ptr(),
                 picker_view_controller_delegate_trampoline,
                 user_info.as_ptr(),
-                &mut error,
+                &raw mut error,
             )
         };
         if let Some(raw) = NonNull::new(raw) {

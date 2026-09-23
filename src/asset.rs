@@ -274,7 +274,8 @@ impl PHAsset {
     pub fn fetch(fetch_options: &PHFetchOptions) -> Result<PHFetchResult<Self>, PhotoKitError> {
         let options_json = json_cstring(fetch_options, "PHFetchOptions")?;
         let mut error = ptr::null_mut();
-        let payload = unsafe { ffi::ph_asset_fetch_all_json(options_json.as_ptr(), &mut error) };
+        let payload =
+            unsafe { ffi::ph_asset_fetch_all_json(options_json.as_ptr(), &raw mut error) };
         if payload.is_null() {
             Err(unsafe { PhotoKitError::from_error_ptr(error, "fetch assets failed") })
         } else {
@@ -299,7 +300,7 @@ impl PHAsset {
                     PHMediaType::Audio => 3,
                 },
                 options_json.as_ptr(),
-                &mut error,
+                &raw mut error,
             )
         };
         if payload.is_null() {
@@ -324,7 +325,7 @@ impl PHAsset {
             ffi::ph_asset_fetch_with_local_identifiers_json(
                 identifiers_json.as_ptr(),
                 options_json.as_ptr(),
-                &mut error,
+                &raw mut error,
             )
         };
         if payload.is_null() {
@@ -350,7 +351,7 @@ impl PHAsset {
             ffi::ph_asset_fetch_in_collection_json(
                 collection_identifier.as_ptr(),
                 options_json.as_ptr(),
-                &mut error,
+                &raw mut error,
             )
         };
         if payload.is_null() {
@@ -376,7 +377,7 @@ impl PHAsset {
             ffi::ph_asset_fetch_key_assets_in_collection_json(
                 collection_identifier.as_ptr(),
                 options_json.as_ptr(),
-                &mut error,
+                &raw mut error,
             )
         };
         if payload.is_null() {
@@ -411,7 +412,7 @@ impl PHAsset {
             ffi::ph_asset_can_perform_edit_operation(
                 asset_identifier.as_ptr(),
                 edit_operation.as_raw(),
-                &mut error,
+                &raw mut error,
             )
         };
         if error.is_null() {
@@ -427,7 +428,7 @@ impl PHAsset {
     pub fn resources(&self) -> Result<Vec<PHAssetResource>, PhotoKitError> {
         let identifier = cstring_from_str(&self.local_identifier, "asset local identifier")?;
         let mut error = ptr::null_mut();
-        let payload = unsafe { ffi::ph_asset_resources_json(identifier.as_ptr(), &mut error) };
+        let payload = unsafe { ffi::ph_asset_resources_json(identifier.as_ptr(), &raw mut error) };
         if payload.is_null() {
             Err(unsafe { PhotoKitError::from_error_ptr(error, "asset resources failed") })
         } else {

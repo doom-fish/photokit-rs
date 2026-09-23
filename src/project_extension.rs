@@ -263,7 +263,7 @@ impl PHProjectExtensionContext {
     pub fn photo_library(&self) -> Result<PHPhotoLibrary, PhotoKitError> {
         let mut error = ptr::null_mut();
         let raw = unsafe {
-            ffi::ph_project_extension_context_photo_library(self.raw.as_ptr(), &mut error)
+            ffi::ph_project_extension_context_photo_library(self.raw.as_ptr(), &raw mut error)
         };
         let raw = NonNull::new(raw).ok_or_else(|| unsafe {
             PhotoKitError::from_error_ptr(error, "project extension photo library lookup failed")
@@ -275,7 +275,7 @@ impl PHProjectExtensionContext {
     pub fn project(&self) -> Result<PHProject, PhotoKitError> {
         let mut error = ptr::null_mut();
         let payload = unsafe {
-            ffi::ph_project_extension_context_project_json(self.raw.as_ptr(), &mut error)
+            ffi::ph_project_extension_context_project_json(self.raw.as_ptr(), &raw mut error)
         };
         if payload.is_null() {
             Err(unsafe { PhotoKitError::from_error_ptr(error, "project extension project lookup failed") })
@@ -293,7 +293,7 @@ impl PHProjectExtensionContext {
             ffi::ph_project_extension_context_show_editor_for_asset(
                 self.raw.as_ptr(),
                 asset_identifier.as_ptr(),
-                &mut error,
+                &raw mut error,
             )
         };
         if status == ffi::status::OK && error.is_null() {
@@ -313,7 +313,7 @@ impl PHProjectExtensionContext {
             ffi::ph_project_extension_context_updated_project_info_json(
                 self.raw.as_ptr(),
                 timeout_ms,
-                &mut error,
+                &raw mut error,
             )
         };
         if payload.is_null() {

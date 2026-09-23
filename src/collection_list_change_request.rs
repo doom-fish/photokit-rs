@@ -178,7 +178,7 @@ impl PHCollectionListChangeRequest {
         let status = unsafe {
             ffi::ph_collection_list_change_request_delete_json(
                 identifiers_json.as_ptr(),
-                &mut error,
+                &raw mut error,
             )
         };
         if status == ffi::status::OK && error.is_null() {
@@ -196,7 +196,10 @@ impl PHChangeRequest for PHCollectionListChangeRequest {
         let payload_json = json_cstring(&self, "PHCollectionListChangeRequest")?;
         let mut error = core::ptr::null_mut();
         let payload = unsafe {
-            ffi::ph_collection_list_change_request_perform_json(payload_json.as_ptr(), &mut error)
+            ffi::ph_collection_list_change_request_perform_json(
+                payload_json.as_ptr(),
+                &raw mut error,
+            )
         };
         if payload.is_null() {
             Err(unsafe {

@@ -64,7 +64,7 @@ impl PHCollection {
             ffi::ph_collection_fetch_in_collection_list_json(
                 identifier.as_ptr(),
                 options_json.as_ptr(),
-                &mut error,
+                &raw mut error,
             )
         };
         if payload.is_null() {
@@ -84,7 +84,7 @@ impl PHCollection {
         let payload = unsafe {
             ffi::ph_collection_fetch_top_level_user_collections_json(
                 options_json.as_ptr(),
-                &mut error,
+                &raw mut error,
             )
         };
         if payload.is_null() {
@@ -108,7 +108,7 @@ impl PHCollection {
             ffi::ph_collection_can_perform_edit_operation(
                 identifier.as_ptr(),
                 edit_operation.as_raw(),
-                &mut error,
+                &raw mut error,
             )
         };
         if error.is_null() {

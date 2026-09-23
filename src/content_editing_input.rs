@@ -113,7 +113,7 @@ impl PHContentEditingInput {
             )
         })?;
         let mut error = ptr::null_mut();
-        let payload = ffi::ph_content_editing_input_json(raw.as_ptr(), &mut error);
+        let payload = ffi::ph_content_editing_input_json(raw.as_ptr(), &raw mut error);
         if payload.is_null() {
             Err(PhotoKitError::from_error_ptr(
                 error,
@@ -169,7 +169,7 @@ impl PHAsset {
                 asset_identifier.as_ptr(),
                 options_json.as_ptr(),
                 timeout_ms,
-                &mut error,
+                &raw mut error,
             )
         };
         if raw.is_null() {

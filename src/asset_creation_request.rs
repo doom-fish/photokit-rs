@@ -112,7 +112,7 @@ impl PHAssetCreationRequest {
         let supported = unsafe {
             ffi::ph_asset_creation_request_supports_resource_types(
                 resource_types_json.as_ptr(),
-                &mut error,
+                &raw mut error,
             )
         };
         if error.is_null() {
@@ -131,8 +131,9 @@ impl PHAssetCreationRequest {
     pub fn perform(self) -> Result<String, PhotoKitError> {
         let resources_json = json_cstring(&self.resources, "asset creation resources")?;
         let mut error = ptr::null_mut();
-        let payload =
-            unsafe { ffi::ph_asset_creation_request_perform(resources_json.as_ptr(), &mut error) };
+        let payload = unsafe {
+            ffi::ph_asset_creation_request_perform(resources_json.as_ptr(), &raw mut error)
+        };
         if payload.is_null() {
             Err(unsafe { PhotoKitError::from_error_ptr(error, "asset creation failed") })
         } else {

@@ -106,7 +106,7 @@ impl PHCollectionList {
             ffi::ph_collection_list_fetch_containing_collection_json(
                 collection_identifier.as_ptr(),
                 options_json.as_ptr(),
-                &mut error,
+                &raw mut error,
             )
         };
         if payload.is_null() {
@@ -134,7 +134,7 @@ impl PHCollectionList {
             ffi::ph_collection_list_fetch_with_local_identifiers_json(
                 identifiers_json.as_ptr(),
                 options_json.as_ptr(),
-                &mut error,
+                &raw mut error,
             )
         };
         if payload.is_null() {
@@ -164,7 +164,7 @@ impl PHCollectionList {
                 collection_list_type.as_raw(),
                 collection_list_subtype.raw_value(),
                 options_json.as_ptr(),
-                &mut error,
+                &raw mut error,
             )
         };
         if payload.is_null() {
@@ -200,7 +200,7 @@ impl PHCollectionList {
             ffi::ph_collection_list_can_perform_edit_operation(
                 collection_identifier.as_ptr(),
                 edit_operation.as_raw(),
-                &mut error,
+                &raw mut error,
             )
         };
         if error.is_null() {

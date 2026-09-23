@@ -159,7 +159,7 @@ impl PHAssetCollectionChangeRequest {
         let status = unsafe {
             ffi::ph_asset_collection_change_request_delete_json(
                 identifiers_json.as_ptr(),
-                &mut error,
+                &raw mut error,
             )
         };
         if status == ffi::status::OK && error.is_null() {
@@ -177,7 +177,10 @@ impl PHChangeRequest for PHAssetCollectionChangeRequest {
         let payload_json = json_cstring(&self, "PHAssetCollectionChangeRequest")?;
         let mut error = core::ptr::null_mut();
         let payload = unsafe {
-            ffi::ph_asset_collection_change_request_perform_json(payload_json.as_ptr(), &mut error)
+            ffi::ph_asset_collection_change_request_perform_json(
+                payload_json.as_ptr(),
+                &raw mut error,
+            )
         };
         if payload.is_null() {
             Err(unsafe {

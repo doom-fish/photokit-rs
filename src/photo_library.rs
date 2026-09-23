@@ -170,7 +170,7 @@ impl PHPhotoLibrary {
     ) -> Result<PHAuthorizationStatus, PhotoKitError> {
         let mut error = ptr::null_mut();
         let status = unsafe {
-            ffi::ph_request_authorization_for_access_level(access_level.as_raw(), &mut error)
+            ffi::ph_request_authorization_for_access_level(access_level.as_raw(), &raw mut error)
         };
         if error.is_null() {
             Ok(PHAuthorizationStatus::from_raw(status))
@@ -198,7 +198,7 @@ impl PHPhotoLibrary {
     pub fn unavailability_reason(&self) -> Result<Option<NSErrorInfo>, PhotoKitError> {
         let mut error = ptr::null_mut();
         let payload = unsafe {
-            ffi::ph_photo_library_unavailability_reason_json(self.raw.as_ptr(), &mut error)
+            ffi::ph_photo_library_unavailability_reason_json(self.raw.as_ptr(), &raw mut error)
         };
         if payload.is_null() {
             Err(unsafe {
@@ -257,7 +257,7 @@ impl PHPhotoLibrary {
                 user_info.as_ptr(),
                 availability_context_retain,
                 availability_context_release,
-                &mut error,
+                &raw mut error,
             )
         };
         if let Some(raw) = NonNull::new(raw) {
@@ -279,7 +279,7 @@ impl PHPhotoLibrary {
     pub fn current_change_token(&self) -> Result<PHPersistentChangeToken, PhotoKitError> {
         let mut error = ptr::null_mut();
         let payload = unsafe {
-            ffi::ph_photo_library_current_change_token_json(self.raw.as_ptr(), &mut error)
+            ffi::ph_photo_library_current_change_token_json(self.raw.as_ptr(), &raw mut error)
         };
         if payload.is_null() {
             Err(unsafe {
@@ -301,7 +301,7 @@ impl PHPhotoLibrary {
             ffi::ph_photo_library_fetch_persistent_changes_since_token_json(
                 self.raw.as_ptr(),
                 token_json.as_ptr(),
-                &mut error,
+                &raw mut error,
             )
         };
         if payload.is_null() {
@@ -329,7 +329,7 @@ impl PHPhotoLibrary {
                 user_info.as_ptr(),
                 change_context_retain,
                 change_context_release,
-                &mut error,
+                &raw mut error,
             )
         };
 

@@ -37,7 +37,7 @@ impl PHProject {
         let options_json = json_cstring(fetch_options, "PHFetchOptions")?;
         let mut error = ptr::null_mut();
         let payload =
-            unsafe { ffi::ph_project_fetch_top_level_json(options_json.as_ptr(), &mut error) };
+            unsafe { ffi::ph_project_fetch_top_level_json(options_json.as_ptr(), &raw mut error) };
         if payload.is_null() {
             Err(unsafe { PhotoKitError::from_error_ptr(error, "fetch projects failed") })
         } else {
@@ -58,7 +58,7 @@ impl PHProject {
             ffi::ph_project_fetch_with_local_identifiers_json(
                 identifiers_json.as_ptr(),
                 options_json.as_ptr(),
-                &mut error,
+                &raw mut error,
             )
         };
         if payload.is_null() {
@@ -178,7 +178,7 @@ impl PHChangeRequest for PHProjectChangeRequest {
         let payload_json = json_cstring(&self, "PHProjectChangeRequest")?;
         let mut error = ptr::null_mut();
         let status = unsafe {
-            ffi::ph_project_change_request_perform_json(payload_json.as_ptr(), &mut error)
+            ffi::ph_project_change_request_perform_json(payload_json.as_ptr(), &raw mut error)
         };
         if status == ffi::status::OK && error.is_null() {
             Ok(())
