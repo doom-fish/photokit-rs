@@ -1,5 +1,94 @@
 # Changelog
 
+All notable changes to `photokit` are documented here.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.5.0] - Unreleased
+
+### Security
+
+- `PHChangeObserver` and `PHAvailabilityObserver` no longer free their callback
+  while a notification is in flight: each Swift observer holds its own
+  reference to the callback context until it is deallocated. Up to 0.4.5,
+  dropping an observer during delivery could use freed memory.
+- The live photo frame processor stays alive for as long as PhotoKit can call
+  it. Clearing or dropping it while a prepare or save was rendering (PhotoKit
+  renders with a copy of the processor block) could call freed memory.
+- Fetch predicates are parsed without variadic arguments. A format specifier
+  such as `%@` in `PHFetchOptions::with_predicate` read a nonexistent argument
+  (undefined behaviour).
+- The synchronous live photo save no longer writes the caller's error pointer
+  from the completion handler, which after a timeout wrote into a dead stack
+  frame.
+
+### Fixed
+
+- Change requests (`PHAssetChangeRequest`, `PHAssetCollectionChangeRequest`,
+  `PHCollectionListChangeRequest`, `PHAssetCreationRequest`,
+  `PHProjectChangeRequest`, sync and async) validate local identifiers, file
+  URLs, base64 data, creation dates and mutation indexes before calling
+  PhotoKit, and return errors instead of aborting the process through `try!`,
+  `fatalError` or an Objective-C exception.
+- Malformed fetch predicates and unsupported predicate or sort keys return an
+  error instead of aborting the process.
+- Creating assets from image or video file URLs, file-backed creation
+  resources and project preview images work. The URL fields were serialized
+  as `createImageFileUrl`, `fileUrl` and so on, while the bridge decodes
+  `createImageFileURL` and `fileURL`, so they never reached PhotoKit.
+- `PHContentEditingOutput` snapshots and `write_data_for_asset_resource`
+  results parse again, and `PHContentEditingInputInfo::full_size_image_url`
+  and `PHVideoResult::asset_url` are populated (`renderedContentURL`,
+  `fileURL`, `fullSizeImageURL` and `assetURL` keys).
+- `PHLivePhotoEditingContext::new` and live photo saves passed the retained
+  bridge boxes to PhotoKit as if they were `PHContentEditingInput` and
+  `PHContentEditingOutput` objects.
+- Async `request_image` completes with `fastFormat` and `highQualityFormat`;
+  it waited for a non-degraded result that PhotoKit never sends, and leaked
+  the future's context. Results report the real `degraded` flag.
+- Synchronous image and live photo request handles return the final result in
+  opportunistic mode instead of the degraded preview, and their completion
+  state is lock-protected against a concurrent `cancel()`.
+- Timeouts above `i64::MAX` milliseconds (such as `u64::MAX` meaning "wait
+  forever") wait indefinitely instead of crashing the process.
+- Waits on the main thread run the main run loop, so PhotoKit's main-queue
+  deliveries arrive instead of timing out.
+- `request_data_for_asset_resource` streams the bytes into the result instead
+  of building base64 JSON copies, which peaked at four to five times the
+  resource size.
+- `write_data_for_asset_resource` cancels the transfer and removes the partial
+  file when it times out; it used to return an error while PhotoKit kept
+  writing.
+- The JSON snapshots of content editing inputs and outputs return an error
+  instead of aborting when a value cannot be encoded, and integer conversions
+  of framework values no longer trap.
+- The async authorization tests skip instead of blocking on a Photos prompt
+  when the authorization status is undetermined.
+
+### Changed
+
+- **Breaking:** `PHAssetResourceDataResult` carries the bytes as
+  `data: Vec<u8>` instead of `data_base64: String`.
+- **Breaking:** `SaveLivePhotoFuture` and `PrepareLivePhotoFuture` borrow the
+  editing context (and output) they were created from.
+- **Breaking:** `PHLivePhotoView::new` and `PHPickerViewController::new`
+  return an error when called off the main thread.
+- A failed synchronous `save_live_photo_to_output` returns an error instead of
+  `Ok` with `success: false`.
+- Index-based collection mutations after `add` or `remove` in the same change
+  request are rejected, because their range cannot be checked.
+- `write_data_for_asset_resource` reports an error in its result when the
+  destination file already exists, like `writeData`.
+- URL fields serialize under the bridge's key names (`fileURL`,
+  `createImageFileURL`, ...); the previous camelCase spellings are still
+  accepted when deserializing.
+- Requires `doom-fish-utils` 0.4.1. `rust-version` is now 1.82.
+
+### Removed
+
+- **Breaking:** `PHAssetResourceDataResult::data()`; read the `data` field.
+
 ## [0.4.5] - 2026-05-20
 
 - Migrated local `take_string` body to call `doom_fish_utils::ffi_string::take_owned_cstring_c`. Centralises the duplicated FFI take-string pattern fleet-wide. No public API change.
