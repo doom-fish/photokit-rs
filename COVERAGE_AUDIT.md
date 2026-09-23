@@ -6,6 +6,8 @@ GAPS: 0
 EXEMPT: 3
 COVERAGE_PCT: 100.0%
 
+> **Scope of these numbers.** Counts are symbol-level against MacOSX26.2.sdk and were not regenerated against the SDK now installed (26.5). A symbol counts as VERIFIED when a Rust wrapper type exists; that does not verify each method. Several VERIFIED wrappers had paths that did not work until 0.5.0 (see [COVERAGE.md](COVERAGE.md)).
+
 This audit is **symbol-level**, not per-method: a type counts as verified when the crate exposes that Photos.framework symbol (or an idiomatic Rust wrapper for it) through its public API. Per the audit rubric, iOS-only/macOS-unavailable symbols were filtered out, and plain request-id/block typedefs (for example `PHImageRequestID`) were not counted because the rubric only scores interfaces, protocols, enums/structs, exported constants, and top-level functions.
 
 Filtered-out unavailable families include `PHAssetResourceUploadJob*`, `PHLivePhotoShouldRenderAtPlaybackTime`, the `PHLivePhoto (NSItemProvider)` category, and other non-macOS-only declarations.

@@ -1,10 +1,12 @@
-# Photos.framework coverage (photokit v0.2.1)
+# Photos.framework coverage (photokit v0.5.0)
 
 Legend:
 
 - ✅ implemented
 - 🟡 partial
 - ⏭️ skipped
+
+✅ means the API is wired through the Swift bridge and exposed in Rust. It does not mean every path is exercised by automated tests: tests that need a photo library run only when access has already been granted, and PhotoKit's asynchronous deliveries also need a running main run loop, so most request paths are checked by code review rather than by `cargo test`. Before 0.5.0 several ✅ rows did not work at all: asset creation from file URLs, file-backed creation resources and project preview images (the URL fields were sent under the wrong JSON keys), `PHContentEditingOutput` snapshots and `write_data` results (their URL keys failed to parse), and `PHLivePhotoEditingContext` creation (the bridge passed the wrong object to PhotoKit).
 
 | Area | API row | Status | Notes |
 | --- | --- | --- | --- |
@@ -40,7 +42,7 @@ Legend:
 | PHImageManager | request live photo | ✅ | `PHImageManager::request_live_photo`. |
 | PHImageManager | video requests (`requestPlayerItem`, `requestExportSession`, `requestAVAsset`) | ✅ | Covered by `PHVideoRequestOptions` and the three synchronous video request helpers. |
 | PHImageManager | cancel image requests | ✅ | Shared request-handle cancellation path. |
-| PHAssetResourceManager | request data / write data for asset resources | ✅ | Covered by `PHAssetResourceManager` + `PHAssetResourceRequestOptions`. |
+| PHAssetResourceManager | request data / write data for asset resources | ✅ | Covered by `PHAssetResourceManager` + `PHAssetResourceRequestOptions`. Request data streams raw bytes; write data is built on `requestData` so a timeout cancels the transfer and removes the partial file. |
 | PHCachingImageManager | start/stop caching + stop all | ✅ | Covered by `PHCachingImageManager`. |
 | PHFetchResult | `count`, `firstObject`, `lastObject`, indexed access, iteration | ✅ | Exposed on generic `PHFetchResult<T>`. |
 | PHFetchResult | `containsObject`, `indexOfObject`, `objectsAtIndexes`, `countOfAssetsWithMediaType` | ✅ | Exposed on the Rust convenience wrapper. |
@@ -53,7 +55,7 @@ Legend:
 | PHContentEditingOutput | `adjustmentData`, `renderedContentURL` | ✅ | Getter/setter and snapshot support are bridged. |
 | PHContentEditingOutput | `defaultRenderedContentType`, `supportedRenderedContentTypes`, `renderedContentURLForType` | ✅ | Available on supported macOS versions. |
 | PHContentEditingOutput | `init(placeholderForCreatedAsset:)` | 🟡 | Deferred. |
-| PHFetchOptions | predicate, sort descriptors, hidden/burst/source-type filters, fetch limit, incremental change flag | ✅ | Fully bridged, including typed source-type option sets. |
+| PHFetchOptions | predicate, sort descriptors, hidden/burst/source-type filters, fetch limit, incremental change flag | ✅ | Bridged, including typed source-type option sets. Predicates are NSPredicate format strings parsed without arguments; malformed predicates and unsupported predicate or sort keys return errors. |
 | PHAssetCreationRequest | `creationRequestForAsset`, `supportsAssetResourceTypes:` | ✅ | Bridged via synchronous perform-changes helper. |
 | PHAssetCreationRequest | `addResource(with:fileURL:options:)`, `addResource(with:data:options:)` | ✅ | File + in-memory resource creation are supported. |
 | PHAssetResourceCreationOptions | `originalFilename`, `uniformTypeIdentifier`, `contentType`, `shouldMoveFile` | ✅ | Bridged on supported macOS versions. |

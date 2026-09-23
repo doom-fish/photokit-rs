@@ -6,6 +6,8 @@ GAPS: 0
 EXEMPT: 3
 COVERAGE_PCT: 100.0%
 
+> **Scope of these numbers.** Counts are symbol-level against MacOSX26.2.sdk and were not regenerated against the SDK now installed (26.5). A symbol counts as VERIFIED when a Rust wrapper type exists; that does not verify each method. Several VERIFIED wrappers had paths that did not work until 0.5.0 (see [COVERAGE.md](COVERAGE.md)).
+
 ## Methodology
 
 This audit verifies photokit-rs coverage against Photos.framework in MacOSX26.2.sdk. Enumeration included all interfaces, protocols, enums, structs, exported constants, and top-level functions declared in the framework's 33 public headers. iOS-only symbols (annotated with `API_UNAVAILABLE(macos)` or without macOS availability), deprecated symbols from earlier macOS versions, and request-id/block typedefs were filtered per the audit rubric. The crate's public API was cross-referenced through Rust modules and Swift bridge implementations. New symbols in macOS 26.0/26.1 are primarily property additions to existing types (e.g., `contentType`, `addedDate` on `PHAssetResource`); the single new error code `PHPhotosErrorLimitExceeded` (macOS 26.1) was found to be already wrapped. Exempt entries were re-validated against their SDK availability attributes.

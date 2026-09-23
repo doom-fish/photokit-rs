@@ -2,7 +2,20 @@
 
 Safe Rust bindings for Apple's [Photos](https://developer.apple.com/documentation/photos) framework on macOS.
 
-> **Status:** v0.3.0 adds the Tier-1 `async_api` module on top of the fully audited Photos.framework surface, with executor-agnostic futures for authorization, `performChanges`, image requests, and live-photo editing callbacks.
+> **Status:** 0.5.0 is a soundness release. Change requests return errors instead of aborting the process, callback contexts outlive in-flight PhotoKit calls, image requests complete on PhotoKit's final result, and fetch predicates can no longer read undefined memory. See the [CHANGELOG](CHANGELOG.md) for the breaking changes.
+
+## Requirements
+
+- macOS 13 or later. A few properties need macOS 14 or 26; the bridge checks availability at runtime and reports them as absent or returns an error on older systems.
+- Xcode or the Swift toolchain: `build.rs` builds the Swift bridge with `swift build`.
+- Photos access. Apps need `NSPhotoLibraryUsageDescription` (and `NSPhotoLibraryAddUsageDescription` for add-only access) in `Info.plist`; sandboxed apps also need the `com.apple.security.personal-information.photos-library` entitlement. Command-line tools get the system prompt attributed to the terminal that runs them. `request_authorization` shows that prompt; the blocking variant waits up to 30 seconds for an answer and the async one until the user responds.
+
+## Threading
+
+- PhotoKit delivers asynchronous image, live photo and content editing results on the main queue. A blocking `wait()` on the main thread runs the main run loop while it waits. From any other thread, the main thread must be running a run loop (an AppKit app, or `CFRunLoopRun`); otherwise the wait times out. The async futures have the same requirement, so don't block the main thread (for example with `pollster::block_on`) while awaiting an image request.
+- A timeout of `u64::MAX` milliseconds waits indefinitely.
+- `PHLivePhotoView` and `PHPickerViewController` are AppKit objects: create them on the main thread (their wrappers are `!Send`); `new()` returns an error on any other thread.
+- Fetch predicates are NSPredicate format strings parsed without arguments. Format specifiers such as `%@`, malformed predicates, and keys PhotoKit doesn't support return an error.
 
 ## Quick start
 
