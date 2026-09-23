@@ -16,7 +16,7 @@ func pkrEncodeProjectAssetElement(_ element: PHProjectAssetElement) -> PKRProjec
     PKRProjectAssetElementPayload(
         weight: element.weight,
         placement: element.placement.isNull ? nil : pkrRectPayload(element.placement),
-        cloudAssetIdentifier: pkrEncodeCloudIdentifier(element.cloudAssetIdentifier)!,
+        cloudAssetIdentifier: PKRCloudIdentifierPayload(stringValue: element.cloudAssetIdentifier.stringValue),
         annotation: element.annotation,
         cropRect: pkrRectPayload(element.cropRect),
         regionsOfInterest: element.regionsOfInterest.map(pkrEncodeProjectRegionOfInterest),

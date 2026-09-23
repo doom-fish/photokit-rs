@@ -47,7 +47,7 @@ func pkrAssetCollectionType(rawValue: Int32) throws -> PHAssetCollectionType {
 }
 
 func pkrEncodeCollection(_ collection: PHAssetCollection) -> PKRAssetCollectionPayload {
-    let estimatedAssetCount: UInt64? = collection.estimatedAssetCount == NSNotFound ? nil : UInt64(collection.estimatedAssetCount)
+    let estimatedAssetCount: UInt64? = collection.estimatedAssetCount == NSNotFound ? nil : UInt64(exactly: collection.estimatedAssetCount)
     return PKRAssetCollectionPayload(
         localIdentifier: collection.localIdentifier,
         localizedTitle: collection.localizedTitle,

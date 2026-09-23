@@ -451,7 +451,7 @@ unsafe extern "C" fn availability_observer_trampoline(
     // SAFETY: `user_info` is a `RefCounted<Box<AvailabilityCallback>>` kept
     // alive by both the `PHAvailabilityObserver` token and the Swift observer
     // object (which holds a `+1` for the duration of any in-flight callback).
-    let callback = &mut (*(user_info.cast::<RefCounted<Box<AvailabilityCallback>>>())).value;
+    let callback = &(*(user_info.cast::<RefCounted<Box<AvailabilityCallback>>>())).value;
     let payload = if payload_json.is_null() {
         PHPhotoLibraryAvailabilityChange::default()
     } else if let Some(json) = take_string(payload_json) {

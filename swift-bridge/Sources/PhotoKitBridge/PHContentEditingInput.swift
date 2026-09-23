@@ -144,7 +144,12 @@ public func ph_content_editing_input_json(
     }
 
     let contentEditingInput = pkrBorrow(input, as: PKRContentEditingInputBox.self).input
-    return pkrCString(try! pkrEncodeJSON(pkrEncodeContentEditingInput(contentEditingInput)))
+    do {
+        return pkrCString(try pkrEncodeJSON(pkrEncodeContentEditingInput(contentEditingInput)))
+    } catch {
+        pkrSetError(outError, error)
+        return nil
+    }
 }
 
 @_cdecl("ph_content_editing_input_release")

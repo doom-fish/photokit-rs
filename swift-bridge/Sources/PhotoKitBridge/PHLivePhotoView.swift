@@ -90,6 +90,10 @@ public func ph_live_photo_view_is_available() -> Int32 {
 public func ph_live_photo_view_new(
     _ outError: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> UnsafeMutableRawPointer? {
+    guard Thread.isMainThread else {
+        pkrSetMessageError(outError, message: "PHLivePhotoView must be created on the main thread")
+        return nil
+    }
     if #available(macOS 10.12, *) {
         return pkrRetain(PKRLivePhotoViewBox(view: PHLivePhotoView(frame: .zero)))
     }

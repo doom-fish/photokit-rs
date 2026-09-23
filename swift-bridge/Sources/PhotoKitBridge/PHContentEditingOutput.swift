@@ -75,7 +75,12 @@ public func ph_content_editing_output_json(
     }
 
     let contentEditingOutput = pkrBorrow(output, as: PKRContentEditingOutputBox.self).output
-    return pkrCString(try! pkrEncodeJSON(pkrEncodeContentEditingOutput(contentEditingOutput)))
+    do {
+        return pkrCString(try pkrEncodeJSON(pkrEncodeContentEditingOutput(contentEditingOutput)))
+    } catch {
+        pkrSetError(outError, error)
+        return nil
+    }
 }
 
 @_cdecl("ph_content_editing_output_release")

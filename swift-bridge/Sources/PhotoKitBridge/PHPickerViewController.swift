@@ -27,6 +27,10 @@ public func ph_picker_view_controller_new(
     _ photoLibrary: UnsafeMutableRawPointer?,
     _ outError: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> UnsafeMutableRawPointer? {
+    guard Thread.isMainThread else {
+        pkrSetMessageError(outError, message: "PHPickerViewController must be created on the main thread")
+        return nil
+    }
     do {
         let payload = try pkrDecodeJSON(configurationJSON, as: PKRPickerConfigurationPayload.self)
         let library = photoLibrary.map { pkrBorrow($0, as: PKRPhotoLibraryBox.self).library }

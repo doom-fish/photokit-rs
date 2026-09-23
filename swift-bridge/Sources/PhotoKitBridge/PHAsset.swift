@@ -109,8 +109,8 @@ func pkrEncodeAsset(_ asset: PHAsset) -> PKRAssetPayload {
             }
             return nil
         }(),
-        pixelWidth: UInt64(asset.pixelWidth),
-        pixelHeight: UInt64(asset.pixelHeight),
+        pixelWidth: UInt64(clamping: asset.pixelWidth),
+        pixelHeight: UInt64(clamping: asset.pixelHeight),
         location: pkrCoordinatePayload(asset.location),
         mediaType: pkrMediaType(from: asset.mediaType),
         mediaSubtypes: UInt64(asset.mediaSubtypes.rawValue),

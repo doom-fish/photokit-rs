@@ -165,9 +165,9 @@ func pkrAccessLevel(rawValue: Int32) throws -> PHAccessLevel {
 @_cdecl("ph_authorization_status")
 public func ph_authorization_status() -> Int32 {
     if #available(macOS 11.0, *) {
-        return Int32(PHPhotoLibrary.authorizationStatus(for: .readWrite).rawValue)
+        return Int32(clamping: PHPhotoLibrary.authorizationStatus(for: .readWrite).rawValue)
     }
-    return Int32(PHPhotoLibrary.authorizationStatus().rawValue)
+    return Int32(clamping: PHPhotoLibrary.authorizationStatus().rawValue)
 }
 
 @_cdecl("ph_request_authorization")
@@ -181,12 +181,12 @@ public func ph_request_authorization(
 public func ph_authorization_status_for_access_level(_ accessLevelRawValue: Int32) -> Int32 {
     if #available(macOS 11.0, *) {
         do {
-            return Int32(PHPhotoLibrary.authorizationStatus(for: try pkrAccessLevel(rawValue: accessLevelRawValue)).rawValue)
+            return Int32(clamping: PHPhotoLibrary.authorizationStatus(for: try pkrAccessLevel(rawValue: accessLevelRawValue)).rawValue)
         } catch {
-            return Int32(PHPhotoLibrary.authorizationStatus(for: .readWrite).rawValue)
+            return Int32(clamping: PHPhotoLibrary.authorizationStatus(for: .readWrite).rawValue)
         }
     }
-    return Int32(PHPhotoLibrary.authorizationStatus().rawValue)
+    return Int32(clamping: PHPhotoLibrary.authorizationStatus().rawValue)
 }
 
 @_cdecl("ph_request_authorization_for_access_level")
@@ -205,7 +205,7 @@ public func ph_request_authorization_for_access_level(
             }
         } catch {
             pkrSetError(outError, error)
-            return Int32(PHAuthorizationStatus.denied.rawValue)
+            return Int32(clamping: PHAuthorizationStatus.denied.rawValue)
         }
     } else {
         PHPhotoLibrary.requestAuthorization {
@@ -218,7 +218,7 @@ public func ph_request_authorization_for_access_level(
     if status == .notDetermined {
         pkrSetMessageError(outError, message: "photo authorization did not resolve")
     }
-    return Int32(status.rawValue)
+    return Int32(clamping: status.rawValue)
 }
 
 @_cdecl("ph_photo_library_shared")
