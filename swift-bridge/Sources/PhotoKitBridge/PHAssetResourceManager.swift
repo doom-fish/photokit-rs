@@ -5,10 +5,74 @@ struct PKRAssetResourceRequestOptionsPayload: Codable {
     var networkAccessAllowed: Bool
 }
 
-struct PKRAssetResourceDataResultPayload: Codable {
+public typealias PKRDataChunkCallback = @convention(c) (UnsafeRawPointer?, Int, UnsafeMutableRawPointer?) -> Void
+
+struct PKRAssetResourceDataRequestPayload: Codable {
     var requestID: Int32
-    var dataBase64: String
     var error: PKRErrorPayload?
+}
+
+final class PKRDataSink {
+    private let callback: PKRDataChunkCallback
+    private let context: UnsafeMutableRawPointer
+    private let contextRelease: PKRObserverContextCallback
+
+    init(
+        callback: @escaping PKRDataChunkCallback,
+        context: UnsafeMutableRawPointer,
+        contextRetain: PKRObserverContextCallback,
+        contextRelease: @escaping PKRObserverContextCallback
+    ) {
+        self.callback = callback
+        self.context = context
+        self.contextRelease = contextRelease
+        contextRetain(context)
+    }
+
+    deinit {
+        contextRelease(context)
+    }
+
+    func append(_ data: Data) {
+        data.withUnsafeBytes { buffer in
+            callback(buffer.baseAddress, buffer.count, context)
+        }
+    }
+}
+
+final class PKRResourceFileWriter {
+    private let lock = NSLock()
+    private var handle: FileHandle?
+    private var writeError: Error?
+
+    init(handle: FileHandle) {
+        self.handle = handle
+    }
+
+    func write(_ data: Data) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let handle, writeError == nil else { return }
+        do {
+            try handle.write(contentsOf: data)
+        } catch {
+            writeError = error
+        }
+    }
+
+    func close() -> Error? {
+        lock.lock()
+        defer { lock.unlock() }
+        if let handle {
+            do {
+                try handle.close()
+            } catch {
+                writeError = writeError ?? error
+            }
+        }
+        handle = nil
+        return writeError
+    }
 }
 
 struct PKRAssetResourceWriteResultPayload: Codable {
@@ -37,49 +101,48 @@ func pkrBuildAssetResourceRequestOptions(_ payload: PKRAssetResourceRequestOptio
     return options
 }
 
-func pkrAssetResourceFileURL(_ value: String) -> URL {
-    if value.hasPrefix("file://") {
-        return URL(string: value) ?? URL(fileURLWithPath: value)
-    }
-    return URL(fileURLWithPath: value)
-}
-
-@_cdecl("ph_asset_resource_manager_request_data_json")
-public func ph_asset_resource_manager_request_data_json(
+@_cdecl("ph_asset_resource_manager_request_data")
+public func ph_asset_resource_manager_request_data(
     _ resourceJSON: UnsafePointer<CChar>?,
     _ optionsJSON: UnsafePointer<CChar>?,
     _ timeoutMs: UInt64,
+    _ chunkCallback: @escaping PKRDataChunkCallback,
+    _ sinkContext: UnsafeMutableRawPointer?,
+    _ contextRetain: @escaping PKRObserverContextCallback,
+    _ contextRelease: @escaping PKRObserverContextCallback,
     _ outError: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> UnsafeMutablePointer<CChar>? {
+    guard let sinkContext else {
+        pkrSetMessageError(outError, message: "missing data sink")
+        return nil
+    }
+
     do {
         let resourcePayload = try pkrDecodeJSON(resourceJSON, as: PKRAssetResourcePayload.self)
         let optionsPayload = try pkrDecodeJSON(optionsJSON, as: PKRAssetResourceRequestOptionsPayload.self)
         let resource = try pkrRequestAssetResource(from: resourcePayload)
         let manager = PHAssetResourceManager.default()
-        let semaphore = DispatchSemaphore(value: 0)
-        var received = Data()
-        var requestError: NSError?
+        let sink = PKRDataSink(
+            callback: chunkCallback,
+            context: sinkContext,
+            contextRetain: contextRetain,
+            contextRelease: contextRelease
+        )
+        let slot = PKRResultSlot<NSError?>()
         let requestID = manager.requestData(for: resource, options: pkrBuildAssetResourceRequestOptions(optionsPayload)) { data in
-            received.append(data)
+            sink.append(data)
         } completionHandler: { error in
-            requestError = error as NSError?
-            semaphore.signal()
+            slot.fill(.success(error as NSError?))
         }
 
-        let timeout = DispatchTime.now() + .milliseconds(Int(timeoutMs))
-        guard semaphore.wait(timeout: timeout) == .success else {
+        guard let result = slot.wait(timeoutMs: timeoutMs) else {
             manager.cancelDataRequest(requestID)
-            throw NSError(
-                domain: "photokit-rs",
-                code: -1,
-                userInfo: [NSLocalizedDescriptionKey: "asset resource request timed out"]
-            )
+            throw pkrError("asset resource request timed out")
         }
 
-        let payload = PKRAssetResourceDataResultPayload(
+        let payload = PKRAssetResourceDataRequestPayload(
             requestID: requestID,
-            dataBase64: received.base64EncodedString(),
-            error: requestError.map(pkrErrorPayload)
+            error: try result.get().map(pkrErrorPayload)
         )
         return pkrCString(try pkrEncodeJSON(payload))
     } catch {
@@ -105,24 +168,41 @@ public func ph_asset_resource_manager_write_data_json(
         let resourcePayload = try pkrDecodeJSON(resourceJSON, as: PKRAssetResourcePayload.self)
         let optionsPayload = try pkrDecodeJSON(optionsJSON, as: PKRAssetResourceRequestOptionsPayload.self)
         let resource = try pkrRequestAssetResource(from: resourcePayload)
-        let manager = PHAssetResourceManager.default()
-        let destinationURL = pkrAssetResourceFileURL(String(cString: fileURL))
-        let semaphore = DispatchSemaphore(value: 0)
-        var requestError: NSError?
-        manager.writeData(for: resource, toFile: destinationURL, options: pkrBuildAssetResourceRequestOptions(optionsPayload)) { error in
-            requestError = error as NSError?
-            semaphore.signal()
-        }
+        let destinationURL = try pkrFileURL(String(cString: fileURL))
 
-        let timeout = DispatchTime.now() + .milliseconds(Int(timeoutMs))
-        guard semaphore.wait(timeout: timeout) == .success else {
-            throw NSError(
-                domain: "photokit-rs",
-                code: -1,
-                userInfo: [NSLocalizedDescriptionKey: "asset resource write timed out"]
+        let descriptor = open(destinationURL.path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0o644)
+        guard descriptor >= 0 else {
+            let code = Int(errno)
+            let error = NSError(domain: NSPOSIXErrorDomain, code: code, userInfo: [NSFilePathErrorKey: destinationURL.path])
+            let payload = PKRAssetResourceWriteResultPayload(
+                fileURL: destinationURL.absoluteString,
+                success: false,
+                error: pkrErrorPayload(from: error)
             )
+            return pkrCString(try pkrEncodeJSON(payload))
         }
 
+        let writer = PKRResourceFileWriter(handle: FileHandle(fileDescriptor: descriptor, closeOnDealloc: true))
+        let manager = PHAssetResourceManager.default()
+        let slot = PKRResultSlot<NSError?>()
+        let requestID = manager.requestData(for: resource, options: pkrBuildAssetResourceRequestOptions(optionsPayload)) { data in
+            writer.write(data)
+        } completionHandler: { error in
+            slot.fill(.success(error as NSError?))
+        }
+
+        guard let result = slot.wait(timeoutMs: timeoutMs) else {
+            manager.cancelDataRequest(requestID)
+            _ = writer.close()
+            try? FileManager.default.removeItem(at: destinationURL)
+            throw pkrError("asset resource write timed out")
+        }
+
+        let closeError = writer.close()
+        let requestError = try result.get() ?? closeError.map { $0 as NSError }
+        if requestError != nil {
+            try? FileManager.default.removeItem(at: destinationURL)
+        }
         let payload = PKRAssetResourceWriteResultPayload(
             fileURL: destinationURL.absoluteString,
             success: requestError == nil,

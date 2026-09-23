@@ -77,3 +77,15 @@ fn previous_camel_case_url_keys_still_deserialize() {
     assert_eq!(write.file_url, "file:///x");
 }
 
+#[test]
+fn resource_data_results_carry_raw_bytes() {
+    let result = PHAssetResourceDataResult {
+        request_id: 7,
+        data: vec![0, 159, 255],
+        error: None,
+    };
+    let round_trip: PHAssetResourceDataResult =
+        serde_json::from_value(serde_json::to_value(&result).unwrap()).unwrap();
+    assert_eq!(round_trip, result);
+    assert_eq!(round_trip.data, [0, 159, 255]);
+}
