@@ -120,6 +120,31 @@ final class PKROnce {
     }
 }
 
+final class PKRCancellation {
+    private let lock = NSLock()
+    private var cancelled = false
+
+    var isCancelled: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return cancelled
+    }
+
+    func cancel() {
+        lock.lock()
+        cancelled = true
+        lock.unlock()
+    }
+}
+
+let pkrImageRequestQueue: OperationQueue = {
+    let queue = OperationQueue()
+    queue.name = "photokit-rs.image-requests"
+    queue.qualityOfService = .userInitiated
+    queue.maxConcurrentOperationCount = max(2, ProcessInfo.processInfo.activeProcessorCount)
+    return queue
+}()
+
 enum PKRImageContentMode: String, Codable {
     case `default`
     case aspectFit
@@ -134,8 +159,6 @@ struct PKRImageRequestPayload: Codable {
     var deliveryMode: String?
     var resizeMode: String?
     var networkAccessAllowed: Bool
-    var synchronous: Bool
-    var allowSecondaryDegradedImage: Bool
 }
 
 struct PKRImageResultPayload: Codable {
@@ -215,8 +238,8 @@ func pkrInfoFlag(_ info: [AnyHashable: Any], _ keys: String...) -> Bool {
     keys.contains { (info[$0] as? NSNumber)?.boolValue == true }
 }
 
-func pkrDeliversSingleResult(deliveryMode: String?, synchronous: Bool) -> Bool {
-    synchronous || deliveryMode == "highQualityFormat" || deliveryMode == "fastFormat"
+func pkrDeliversSingleResult(deliveryMode: String?) -> Bool {
+    deliveryMode == "highQualityFormat" || deliveryMode == "fastFormat"
 }
 
 func pkrIsFinalImageResult(_ info: [AnyHashable: Any], hasResult: Bool, singleResult: Bool) -> Bool {
@@ -284,9 +307,21 @@ func pkrBuildImageRequestOptions(_ payload: PKRImageRequestPayload) -> PHImageRe
         }
     }
     options.isNetworkAccessAllowed = payload.networkAccessAllowed
-    options.isSynchronous = payload.synchronous
-    if #available(macOS 14.0, *) {
-        options.allowSecondaryDegradedImage = payload.allowSecondaryDegradedImage
+    return options
+}
+
+func pkrBuildSynchronousImageRequestOptions(
+    _ payload: PKRImageRequestPayload,
+    cancellation: PKRCancellation?
+) -> PHImageRequestOptions {
+    let options = pkrBuildImageRequestOptions(payload)
+    options.isSynchronous = true
+    if let cancellation {
+        options.progressHandler = { _, _, stop, _ in
+            if cancellation.isCancelled {
+                stop.pointee = true
+            }
+        }
     }
     return options
 }
@@ -442,20 +477,24 @@ public func ph_image_manager_request_image(
             )
         )
         let targetSize = CGSize(width: request.targetWidth, height: request.targetHeight)
-        let singleResult = pkrDeliversSingleResult(deliveryMode: request.deliveryMode, synchronous: request.synchronous)
-        let requestID = imageManager.requestImage(
-            for: asset,
-            targetSize: targetSize,
-            contentMode: pkrContentMode(from: request.contentMode),
-            options: pkrBuildImageRequestOptions(request)
-        ) { image, info in
-            let info = info ?? [:]
-            guard pkrIsFinalImageResult(info, hasResult: image != nil, singleResult: singleResult) else {
+        let contentMode = pkrContentMode(from: request.contentMode)
+        let cancellation = PKRCancellation()
+        let options = pkrBuildSynchronousImageRequestOptions(request, cancellation: cancellation)
+        box.setCancelHandler { cancellation.cancel() }
+        pkrImageRequestQueue.addOperation {
+            guard !cancellation.isCancelled else {
+                box.cancel()
                 return
             }
-            box.finish(pkrImageResultPayload(image, info: info))
+            imageManager.requestImage(
+                for: asset,
+                targetSize: targetSize,
+                contentMode: contentMode,
+                options: options
+            ) { image, info in
+                box.finish(pkrImageResultPayload(image, info: info ?? [:]))
+            }
         }
-        box.setCancelHandler { imageManager.cancelImageRequest(requestID) }
         return pkrRetain(box)
     } catch {
         pkrSetError(outError, error)
@@ -498,26 +537,31 @@ public func ph_image_manager_request_image_data(
                 )
             )
         )
-        let requestID = imageManager.requestImageDataAndOrientation(
-            for: asset,
-            options: pkrBuildImageRequestOptions(request)
-        ) { imageData, dataUTI, orientation, info in
-            let info = info ?? [:]
-            box.finish(
-                PKRImageDataResultPayload(
-                    dataBase64: imageData?.base64EncodedString() ?? "",
-                    uniformTypeIdentifier: dataUTI,
-                    contentTypeIdentifier: nil,
-                    orientation: Int32(clamping: orientation.rawValue),
-                    cancelled: pkrInfoFlag(info, PHImageCancelledKey),
-                    degraded: pkrInfoFlag(info, PHImageResultIsDegradedKey),
-                    isInCloud: pkrInfoFlag(info, PHImageResultIsInCloudKey),
-                    requestID: pkrRequestID(from: info),
-                    error: pkrResultErrorPayload(from: info, key: PHImageErrorKey)
+        let cancellation = PKRCancellation()
+        let options = pkrBuildSynchronousImageRequestOptions(request, cancellation: cancellation)
+        box.setCancelHandler { cancellation.cancel() }
+        pkrImageRequestQueue.addOperation {
+            guard !cancellation.isCancelled else {
+                box.cancel()
+                return
+            }
+            imageManager.requestImageDataAndOrientation(for: asset, options: options) { imageData, dataUTI, orientation, info in
+                let info = info ?? [:]
+                box.finish(
+                    PKRImageDataResultPayload(
+                        dataBase64: imageData?.base64EncodedString() ?? "",
+                        uniformTypeIdentifier: dataUTI,
+                        contentTypeIdentifier: nil,
+                        orientation: Int32(clamping: orientation.rawValue),
+                        cancelled: pkrInfoFlag(info, PHImageCancelledKey),
+                        degraded: pkrInfoFlag(info, PHImageResultIsDegradedKey),
+                        isInCloud: pkrInfoFlag(info, PHImageResultIsInCloudKey),
+                        requestID: pkrRequestID(from: info),
+                        error: pkrResultErrorPayload(from: info, key: PHImageErrorKey)
+                    )
                 )
-            )
+            }
         }
-        box.setCancelHandler { imageManager.cancelImageRequest(requestID) }
         return pkrRetain(box)
     } catch {
         pkrSetError(outError, error)
@@ -559,7 +603,7 @@ public func ph_image_manager_request_live_photo(
             )
         )
         let targetSize = CGSize(width: request.targetWidth, height: request.targetHeight)
-        let singleResult = pkrDeliversSingleResult(deliveryMode: request.deliveryMode, synchronous: false)
+        let singleResult = pkrDeliversSingleResult(deliveryMode: request.deliveryMode)
         let requestID = imageManager.requestLivePhoto(
             for: asset,
             targetSize: targetSize,

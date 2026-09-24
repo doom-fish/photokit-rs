@@ -2,9 +2,15 @@
 //!   cargo test --all-features --test `async_api_tests`
 #![cfg(feature = "async")]
 
-use photokit::async_api::AsyncPHPhotoLibrary;
+mod common;
+
+use std::sync::mpsc;
+use std::thread;
+use std::time::Duration;
+
+use photokit::async_api::{AsyncPHImageManager, AsyncPHPhotoLibrary};
 use photokit::error::PHAuthorizationStatus;
-use photokit::{PHAccessLevel, PHPhotoLibrary};
+use photokit::{PHAccessLevel, PHImageContentMode, PHImageRequest, PHPhotoLibrary};
 
 fn authorization_is_determined(access_level: PHAccessLevel) -> bool {
     PHPhotoLibrary::authorization_status_for_access_level(access_level)
@@ -46,4 +52,27 @@ fn test_request_authorization_add_only_resolves() {
     ));
 
     assert!(status.is_ok(), "expected Ok but got {status:?}");
+}
+
+#[test]
+fn image_futures_resolve_while_the_main_thread_is_blocked() {
+    let (sender, receiver) = mpsc::channel();
+    thread::spawn(move || {
+        let resolved = common::first_asset().map(|asset| {
+            let manager = AsyncPHImageManager::shared().expect("image manager");
+            let request = PHImageRequest::new(64.0, 64.0, PHImageContentMode::AspectFit);
+            let image = manager
+                .request_image(&asset, request)
+                .map(pollster::block_on);
+            let data = manager
+                .request_image_data(&asset, &request)
+                .map(pollster::block_on);
+            (image.is_ok(), data.is_ok())
+        });
+        let _ = sender.send(resolved);
+    });
+    assert!(
+        receiver.recv_timeout(Duration::from_secs(30)).is_ok(),
+        "image futures did not resolve"
+    );
 }

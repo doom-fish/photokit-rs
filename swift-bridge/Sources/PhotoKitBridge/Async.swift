@@ -150,35 +150,32 @@ public func ph_image_manager_request_image_async(
         return
     }
 
-    let options = pkrBuildImageRequestOptions(request)
+    let options = pkrBuildSynchronousImageRequestOptions(request, cancellation: nil)
     let targetSize = CGSize(width: request.targetWidth, height: request.targetHeight)
     let contentMode = pkrContentMode(from: request.contentMode)
-    let singleResult = pkrDeliversSingleResult(deliveryMode: request.deliveryMode, synchronous: request.synchronous)
     let delivery = PKROnce()
-    mgr.requestImage(
-        for: asset,
-        targetSize: targetSize,
-        contentMode: contentMode,
-        options: options
-    ) { image, info in
-        let info = info ?? [:]
-        guard pkrIsFinalImageResult(info, hasResult: image != nil, singleResult: singleResult),
-              delivery.claim() else {
-            return
-        }
-
-        let payload = pkrImageResultPayload(image, info: info)
-        if payload.tiffDataBase64.isEmpty && !payload.cancelled && payload.error == nil {
-            let message = pkrInfoFlag(info, PHImageResultIsInCloudKey)
-                ? "image is in iCloud and network access is not allowed"
-                : "image not available"
-            message.withCString { cb(nil, $0, ctx) }
-            return
-        }
-        if let json = try? pkrEncodeJSON(payload) {
-            json.withCString { cb($0, nil, ctx) }
-        } else {
-            "encode failed".withCString { cb(nil, $0, ctx) }
+    pkrImageRequestQueue.addOperation {
+        mgr.requestImage(
+            for: asset,
+            targetSize: targetSize,
+            contentMode: contentMode,
+            options: options
+        ) { image, info in
+            guard delivery.claim() else { return }
+            let info = info ?? [:]
+            let payload = pkrImageResultPayload(image, info: info)
+            if payload.tiffDataBase64.isEmpty && !payload.cancelled && payload.error == nil {
+                let message = pkrInfoFlag(info, PHImageResultIsInCloudKey)
+                    ? "image is in iCloud and network access is not allowed"
+                    : "image not available"
+                message.withCString { cb(nil, $0, ctx) }
+                return
+            }
+            if let json = try? pkrEncodeJSON(payload) {
+                json.withCString { cb($0, nil, ctx) }
+            } else {
+                "encode failed".withCString { cb(nil, $0, ctx) }
+            }
         }
     }
 }
@@ -206,33 +203,35 @@ public func ph_image_manager_request_image_data_async(
         return
     }
 
-    let options = pkrBuildImageRequestOptions(request)
+    let options = pkrBuildSynchronousImageRequestOptions(request, cancellation: nil)
     let delivery = PKROnce()
-    mgr.requestImageDataAndOrientation(for: asset, options: options) { data, uti, orientation, info in
-        guard delivery.claim() else { return }
-        let info = info ?? [:]
-        let contentTypeID: String?
-        if #available(macOS 11.0, *) {
-            contentTypeID = uti.flatMap { UTType($0)?.identifier }
-        } else {
-            contentTypeID = nil
-        }
+    pkrImageRequestQueue.addOperation {
+        mgr.requestImageDataAndOrientation(for: asset, options: options) { data, uti, orientation, info in
+            guard delivery.claim() else { return }
+            let info = info ?? [:]
+            let contentTypeID: String?
+            if #available(macOS 11.0, *) {
+                contentTypeID = uti.flatMap { UTType($0)?.identifier }
+            } else {
+                contentTypeID = nil
+            }
 
-        let payload = PKRImageDataResultPayload(
-            dataBase64: data?.base64EncodedString() ?? "",
-            uniformTypeIdentifier: uti,
-            contentTypeIdentifier: contentTypeID,
-            orientation: Int32(clamping: orientation.rawValue),
-            cancelled: pkrInfoFlag(info, PHImageCancelledKey),
-            degraded: pkrInfoFlag(info, PHImageResultIsDegradedKey),
-            isInCloud: pkrInfoFlag(info, PHImageResultIsInCloudKey),
-            requestID: pkrRequestID(from: info),
-            error: pkrResultErrorPayload(from: info, key: PHImageErrorKey)
-        )
-        if let json = try? pkrEncodeJSON(payload) {
-            json.withCString { cb($0, nil, ctx) }
-        } else {
-            "encode failed".withCString { cb(nil, $0, ctx) }
+            let payload = PKRImageDataResultPayload(
+                dataBase64: data?.base64EncodedString() ?? "",
+                uniformTypeIdentifier: uti,
+                contentTypeIdentifier: contentTypeID,
+                orientation: Int32(clamping: orientation.rawValue),
+                cancelled: pkrInfoFlag(info, PHImageCancelledKey),
+                degraded: pkrInfoFlag(info, PHImageResultIsDegradedKey),
+                isInCloud: pkrInfoFlag(info, PHImageResultIsInCloudKey),
+                requestID: pkrRequestID(from: info),
+                error: pkrResultErrorPayload(from: info, key: PHImageErrorKey)
+            )
+            if let json = try? pkrEncodeJSON(payload) {
+                json.withCString { cb($0, nil, ctx) }
+            } else {
+                "encode failed".withCString { cb(nil, $0, ctx) }
+            }
         }
     }
 }

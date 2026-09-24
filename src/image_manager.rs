@@ -162,12 +162,6 @@ pub struct PHImageRequest {
     #[serde(default)]
     /// Corresponds to `PHImageRequest.networkAccessAllowed`.
     pub network_access_allowed: bool,
-    #[serde(default)]
-    /// Corresponds to `PHImageRequest.synchronous`.
-    pub synchronous: bool,
-    #[serde(default)]
-    /// Corresponds to `PHImageRequest.allowSecondaryDegradedImage`.
-    pub allow_secondary_degraded_image: bool,
 }
 
 impl PHImageRequest {
@@ -181,8 +175,6 @@ impl PHImageRequest {
             delivery_mode: None,
             resize_mode: None,
             network_access_allowed: false,
-            synchronous: false,
-            allow_secondary_degraded_image: false,
         }
     }
 
