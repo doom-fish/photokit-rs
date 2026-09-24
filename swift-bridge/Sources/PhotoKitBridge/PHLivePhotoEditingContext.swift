@@ -25,11 +25,13 @@ final class PKRLivePhotoFrameProcessor {
         contextRelease(userInfo)
     }
 
-    func process(_ frame: PHLivePhotoFrame) -> CIImage? {
-        guard let json = try? pkrEncodeJSON(pkrEncodeLivePhotoFrame(frame)) else {
-            return frame.image
+    func process(_ frame: PHLivePhotoFrame, error: NSErrorPointer) -> CIImage? {
+        guard let json = try? pkrEncodeJSON(pkrEncodeLivePhotoFrame(frame)),
+              json.withCString({ callback($0, userInfo) }) == 0 else {
+            error?.pointee = pkrError("the frame processor aborted the live photo edit")
+            return nil
         }
-        return json.withCString { callback($0, userInfo) } == 1 ? nil : frame.image
+        return frame.image
     }
 }
 
@@ -168,8 +170,8 @@ public func ph_live_photo_editing_context_set_frame_processor(
         contextRetain: contextRetain,
         contextRelease: contextRelease
     )
-    editingContext.frameProcessor = { frame, _ in
-        processor.process(frame)
+    editingContext.frameProcessor = { frame, error in
+        processor.process(frame, error: error)
     }
     return PKR_OK
 }

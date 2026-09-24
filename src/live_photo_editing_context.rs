@@ -55,7 +55,7 @@ pub enum PHLivePhotoFrameProcessingDecision {
     /// Case of `PHLivePhotoFrameProcessingDecision`.
     KeepOriginal,
     /// Case of `PHLivePhotoFrameProcessingDecision`.
-    SkipFrame,
+    Abort,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -274,7 +274,7 @@ unsafe extern "C" fn live_photo_frame_processor_trampoline(
     user_info: *mut c_void,
 ) -> i32 {
     if frame_json.is_null() {
-        return 0;
+        return 1;
     }
 
     FrameProcessorContext::with(
@@ -283,16 +283,16 @@ unsafe extern "C" fn live_photo_frame_processor_trampoline(
         |callback| {
             let frame_json = CStr::from_ptr(frame_json).to_string_lossy();
             let Ok(frame) = serde_json::from_str::<PHLivePhotoFrame>(&frame_json) else {
-                return 0;
+                return 1;
             };
             let mut callback = callback.lock().unwrap_or_else(PoisonError::into_inner);
             match callback(frame) {
                 PHLivePhotoFrameProcessingDecision::KeepOriginal => 0,
-                PHLivePhotoFrameProcessingDecision::SkipFrame => 1,
+                PHLivePhotoFrameProcessingDecision::Abort => 1,
             }
         },
     )
-    .unwrap_or(0)
+    .unwrap_or(1)
 }
 
 #[cfg(test)]
@@ -330,30 +330,30 @@ mod tests {
     fn trampoline_forwards_decisions_while_active() {
         let calls = Arc::new(AtomicUsize::new(0));
         let json = frame_json();
-        let skip = processor(PHLivePhotoFrameProcessingDecision::SkipFrame, &calls);
+        let abort = processor(PHLivePhotoFrameProcessingDecision::Abort, &calls);
         let keep = processor(PHLivePhotoFrameProcessingDecision::KeepOriginal, &calls);
 
-        let skipped =
-            unsafe { live_photo_frame_processor_trampoline(json.as_ptr(), skip.as_ptr()) };
+        let aborted =
+            unsafe { live_photo_frame_processor_trampoline(json.as_ptr(), abort.as_ptr()) };
         let kept = unsafe { live_photo_frame_processor_trampoline(json.as_ptr(), keep.as_ptr()) };
 
-        assert_eq!(skipped, 1);
+        assert_eq!(aborted, 1);
         assert_eq!(kept, 0);
         assert_eq!(calls.load(Ordering::SeqCst), 2);
     }
 
     #[test]
-    fn in_flight_render_after_clear_neither_runs_nor_frees_the_callback() {
+    fn in_flight_render_after_clear_aborts_without_running_or_freeing_the_callback() {
         let calls = Arc::new(AtomicUsize::new(0));
         let json = frame_json();
-        let context = processor(PHLivePhotoFrameProcessingDecision::SkipFrame, &calls);
+        let context = processor(PHLivePhotoFrameProcessingDecision::KeepOriginal, &calls);
         let block_copy = context.retained_ptr();
 
         drop(context);
         assert_eq!(Arc::strong_count(&calls), 2);
 
         let decision = unsafe { live_photo_frame_processor_trampoline(json.as_ptr(), block_copy) };
-        assert_eq!(decision, 0);
+        assert_eq!(decision, 1);
         assert_eq!(calls.load(Ordering::SeqCst), 0);
 
         unsafe { (FrameProcessorContext::RELEASE)(block_copy) };
@@ -361,9 +361,9 @@ mod tests {
     }
 
     #[test]
-    fn trampoline_ignores_null_and_malformed_input() {
+    fn trampoline_aborts_on_null_and_malformed_input() {
         let calls = Arc::new(AtomicUsize::new(0));
-        let context = processor(PHLivePhotoFrameProcessingDecision::SkipFrame, &calls);
+        let context = processor(PHLivePhotoFrameProcessingDecision::KeepOriginal, &calls);
         let malformed = CString::new("{not json").unwrap();
         let json = frame_json();
 
@@ -375,7 +375,7 @@ mod tests {
             ]
         };
 
-        assert_eq!(results, [0, 0, 0]);
+        assert_eq!(results, [1, 1, 1]);
         assert_eq!(calls.load(Ordering::SeqCst), 0);
     }
 
@@ -391,7 +391,7 @@ mod tests {
         let second =
             unsafe { live_photo_frame_processor_trampoline(json.as_ptr(), context.as_ptr()) };
 
-        assert_eq!((first, second), (0, 0));
+        assert_eq!((first, second), (1, 1));
         assert!(context.is_active());
     }
 }
