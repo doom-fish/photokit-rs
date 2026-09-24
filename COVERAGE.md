@@ -44,6 +44,7 @@ Legend:
 | PHImageManager | cancel image requests | ✅ | Shared request-handle cancellation path. |
 | PHAssetResourceManager | request data / write data for asset resources | ✅ | Covered by `PHAssetResourceManager` + `PHAssetResourceRequestOptions`. Request data streams raw bytes; write data is built on `requestData` so a timeout cancels the transfer and removes the partial file. |
 | PHCachingImageManager | start/stop caching + stop all | ✅ | Covered by `PHCachingImageManager`. |
+| PHCachingImageManager | image, image data and live photo requests through the caching instance | 🟡 | Not bridged: requests go through `PHImageManager::shared()`, which does not use a caching manager's cache. |
 | PHFetchResult | `count`, `firstObject`, `lastObject`, indexed access, iteration | ✅ | Exposed on generic `PHFetchResult<T>`. |
 | PHFetchResult | `containsObject`, `indexOfObject`, `objectsAtIndexes`, `countOfAssetsWithMediaType` | ✅ | Exposed on the Rust convenience wrapper. |
 | PHChange | `changeDetails(for:)` object lookups | ✅ | Asset, asset-collection, and collection-list details are bridged. |
