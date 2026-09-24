@@ -6,7 +6,7 @@ Legend:
 - 🟡 partial
 - ⏭️ skipped
 
-✅ means the API is wired through the Swift bridge and exposed in Rust. It does not mean every path is exercised by automated tests: tests that need a photo library run only when access has already been granted, and PhotoKit's asynchronous deliveries also need a running main run loop, so most request paths are checked by code review rather than by `cargo test`. Before 0.5.0 several ✅ rows did not work at all: asset creation from file URLs, file-backed creation resources and project preview images (the URL fields were sent under the wrong JSON keys), `PHContentEditingOutput` snapshots and `write_data` results (their URL keys failed to parse), and `PHLivePhotoEditingContext` creation (the bridge passed the wrong object to PhotoKit).
+✅ means the API is wired through the Swift bridge and exposed in Rust. It does not mean every path is exercised by automated tests: tests that need a photo library run only when access has already been granted. Image and image data requests complete off the main thread and are exercised by `cargo test` when access is granted; live photo and content editing deliveries need a running main run loop, so those paths are checked by code review rather than by `cargo test`. Before 0.5.0 several ✅ rows did not work at all: asset creation from file URLs, file-backed creation resources and project preview images (the URL fields were sent under the wrong JSON keys), `PHContentEditingOutput` snapshots and `write_data` results (their URL keys failed to parse), and `PHLivePhotoEditingContext` creation (the bridge passed the wrong object to PhotoKit).
 
 | Area | API row | Status | Notes |
 | --- | --- | --- | --- |

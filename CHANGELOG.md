@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The synchronous live photo save no longer writes the caller's error pointer
   from the completion handler, which after a timeout wrote into a dead stack
   frame.
+- `PHLivePhotoView` and `PHPickerViewController` delegates keep their callback
+  alive while it runs. A callback that dropped its own registration freed the
+  closure it was executing; the Swift delegate now holds a reference to the
+  callback context until it is deallocated.
 
 ### Fixed
 
@@ -65,6 +69,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   of framework values no longer trap.
 - The async authorization tests skip instead of blocking on a Photos prompt
   when the authorization status is undetermined.
+- Image and image data requests, sync and async, complete without the main
+  thread running a run loop. They run as synchronous PhotoKit requests on a
+  bounded background queue; before, a `wait()` off the main thread timed out
+  and an awaited future never resolved unless the main thread ran a run loop.
+- Library change and availability callbacks that arrive after their observer
+  was dropped are not run, and a `PHChange` delivered then is released.
+- A live photo frame processor that aborts now fails the edit with an error;
+  `SkipFrame` returned nil without one. A processor that panics, was cleared
+  during a render, or receives a frame it cannot decode aborts the edit instead
+  of keeping the original image for that frame.
 
 ### Changed
 
@@ -74,6 +88,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   editing context (and output) they were created from.
 - **Breaking:** `PHLivePhotoView::new` and `PHPickerViewController::new`
   return an error when called off the main thread.
+- **Breaking:** `register_change_observer`,
+  `register_detailed_change_observer` and `register_availability_observer`
+  require `Fn + Send + Sync` callbacks.
+- **Breaking:** `PHLivePhotoFrameProcessingDecision::SkipFrame` is renamed to
+  `Abort`, which is what PhotoKit does with it: the whole live photo edit fails.
+- **Breaking:** cancelling an image or image data request returns the
+  cancelled result at once but no longer interrupts a decode that has already
+  started; queued requests are skipped and iCloud downloads stop.
+- The `register_delegate` callbacks of `PHLivePhotoView` and
+  `PHPickerViewController` no longer need to be `Send`; they always run on the
+  main thread.
 - A failed synchronous `save_live_photo_to_output` returns an error instead of
   `Ok` with `success: false`.
 - Index-based collection mutations after `add` or `remove` in the same change
@@ -88,6 +113,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - **Breaking:** `PHAssetResourceDataResult::data()`; read the `data` field.
+- **Breaking:** `PHImageRequest::synchronous` and
+  `PHImageRequest::allow_secondary_degraded_image`. Every image request runs
+  synchronously on a background queue, and only the final result was ever
+  returned.
 
 ## [0.4.5] - 2026-05-20
 

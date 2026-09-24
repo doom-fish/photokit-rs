@@ -19,9 +19,12 @@ photokit = "0.5"
 
 ## Threading
 
-- PhotoKit delivers asynchronous image, live photo and content editing results on the main queue. A blocking `wait()` on the main thread runs the main run loop while it waits. From any other thread, the main thread must be running a run loop (an AppKit app, or `CFRunLoopRun`); otherwise the wait times out. The async futures have the same requirement, so don't block the main thread (for example with `pollster::block_on`) while awaiting an image request.
+- Image and image data requests (`request_image`, `request_image_data` and their async versions) run as synchronous PhotoKit requests on a background queue, so they complete on any thread without a main run loop. `cancel()` returns the cancelled result at once: a queued request is skipped and an iCloud download stops, while a decode that has already started finishes in the background.
+- PhotoKit has no synchronous form of `request_live_photo`, `PHLivePhoto::request_with_resource_file_urls` or `request_content_editing_input` and delivers their results on the main queue. A blocking `wait()` on the main thread runs the main run loop while it waits. From any other thread, the main thread must be running a run loop (an AppKit app, or `CFRunLoopRun`); otherwise the wait times out.
+- Library change and availability observers run on a PhotoKit background queue, so their callbacks must be `Send + Sync`. Once the observer is dropped, its callback is not called again.
 - A timeout of `u64::MAX` milliseconds waits indefinitely.
-- `PHLivePhotoView` and `PHPickerViewController` are AppKit objects: create them on the main thread (their wrappers are `!Send`); `new()` returns an error on any other thread.
+- `PHLivePhotoView` and `PHPickerViewController` are AppKit objects: create them on the main thread (their wrappers are `!Send`); `new()` returns an error on any other thread. Their delegate callbacks run on the main thread and don't need to be `Send`.
+- A live photo frame processor either keeps each frame's original image or aborts the edit. `PHLivePhotoFrameProcessingDecision::Abort`, a panic in the processor, or a processor cleared during a render makes the prepare or save fail with an error.
 - Fetch predicates are NSPredicate format strings parsed without arguments. Format specifiers such as `%@`, malformed predicates, and keys PhotoKit doesn't support return an error.
 
 ## Quick start
