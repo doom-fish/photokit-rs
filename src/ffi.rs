@@ -6,10 +6,11 @@ pub use doom_fish_utils::ffi_callbacks::JsonCallback;
 
 extern "C" {
     pub fn ph_string_free(string: *mut c_char);
+    pub fn pthread_main_np() -> i32;
 }
 
 pub type ChangeObserverCallback = unsafe extern "C" fn(change: *mut c_void, user_info: *mut c_void);
-pub type ObserverContextCallback = extern "C" fn(user_info: *mut c_void);
+pub type ObserverContextCallback = unsafe extern "C" fn(user_info: *mut c_void);
 pub type LivePhotoFrameProcessorCallback =
     unsafe extern "C" fn(frame_json: *const c_char, user_info: *mut c_void) -> i32;
 pub type ContextCallback = unsafe extern "C" fn(context: *mut c_void);

@@ -12,12 +12,29 @@ final class PKRLivePhotoViewDelegateBox: NSObject, PHLivePhotoViewDelegate {
     weak var view: PHLivePhotoView?
     let callback: PKRLivePhotoViewDelegateCallback
     let userInfo: UnsafeMutableRawPointer?
+    private let contextRelease: PKRObserverContextCallback?
 
-    init(view: PHLivePhotoView, callback: @escaping PKRLivePhotoViewDelegateCallback, userInfo: UnsafeMutableRawPointer?) {
+    init(
+        view: PHLivePhotoView,
+        callback: @escaping PKRLivePhotoViewDelegateCallback,
+        userInfo: UnsafeMutableRawPointer?,
+        contextRetain: PKRObserverContextCallback?,
+        contextRelease: PKRObserverContextCallback?
+    ) {
         self.view = view
         self.callback = callback
         self.userInfo = userInfo
+        self.contextRelease = contextRelease
         super.init()
+        if let userInfo {
+            contextRetain?(userInfo)
+        }
+    }
+
+    deinit {
+        if let userInfo {
+            contextRelease?(userInfo)
+        }
     }
 
     private func sendEvent(kind: String, playbackStyle: PHLivePhotoViewPlaybackStyle) -> Int32 {
@@ -55,6 +72,8 @@ public func ph_live_photo_view_register_delegate(
     _ view: UnsafeMutableRawPointer?,
     _ callback: @escaping PKRLivePhotoViewDelegateCallback,
     _ userInfo: UnsafeMutableRawPointer?,
+    _ contextRetain: @escaping PKRObserverContextCallback,
+    _ contextRelease: @escaping PKRObserverContextCallback,
     _ outError: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> UnsafeMutableRawPointer? {
     guard let view else {
@@ -63,7 +82,13 @@ public func ph_live_photo_view_register_delegate(
     }
 
     let livePhotoView = pkrBorrow(view, as: PKRLivePhotoViewBox.self).view
-    let delegate = PKRLivePhotoViewDelegateBox(view: livePhotoView, callback: callback, userInfo: userInfo)
+    let delegate = PKRLivePhotoViewDelegateBox(
+        view: livePhotoView,
+        callback: callback,
+        userInfo: userInfo,
+        contextRetain: contextRetain,
+        contextRelease: contextRelease
+    )
     livePhotoView.delegate = delegate
     return pkrRetain(delegate)
 }

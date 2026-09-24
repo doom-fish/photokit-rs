@@ -4,12 +4,13 @@ use core::ffi::{c_char, c_void};
 use std::ops::{BitOr, BitOrAssign};
 use std::ptr::{self, NonNull};
 
-use doom_fish_utils::panic_safe::catch_user_panic;
+use doom_fish_utils::callback_context::CallbackContext;
 use serde::{Deserialize, Serialize};
 
 use crate::asset::PHAssetPlaybackStyle;
 use crate::error::PhotoKitError;
 use crate::ffi;
+use crate::main_thread::MainThreadCell;
 use crate::photo_library::PHPhotoLibrary;
 use crate::private::{cstring_from_str, json_cstring, take_string};
 
@@ -470,7 +471,8 @@ impl PHPickerResult {
     }
 }
 
-type PickerDelegateCallback = dyn Fn(Vec<PHPickerResult>) + Send;
+type PickerDelegateCallback = dyn Fn(Vec<PHPickerResult>);
+type PickerDelegateContext = CallbackContext<MainThreadCell<Box<PickerDelegateCallback>>>;
 
 #[derive(Debug)]
 /// Wraps `PHPickerViewController`.
@@ -645,34 +647,28 @@ impl PHPickerViewController {
         callback: F,
     ) -> Result<PHPickerViewControllerDelegate, PhotoKitError>
     where
-        F: Fn(Vec<PHPickerResult>) + Send + 'static,
+        F: Fn(Vec<PHPickerResult>) + 'static,
     {
-        let user_info = unsafe {
-            NonNull::new_unchecked(
-                Box::into_raw(Box::new(Box::new(callback) as Box<PickerDelegateCallback>))
-                    .cast::<c_void>(),
-            )
-        };
+        let context = PickerDelegateContext::new(MainThreadCell::new(
+            Box::new(callback) as Box<PickerDelegateCallback>,
+            "PHPickerViewControllerDelegate",
+        )?);
         let mut error = ptr::null_mut();
         let raw = unsafe {
             ffi::ph_picker_view_controller_register_delegate(
                 self.raw.as_ptr(),
                 picker_view_controller_delegate_trampoline,
-                user_info.as_ptr(),
+                context.as_ptr(),
+                PickerDelegateContext::RETAIN,
+                PickerDelegateContext::RELEASE,
                 &raw mut error,
             )
         };
-        if let Some(raw) = NonNull::new(raw) {
-            Ok(PHPickerViewControllerDelegate { raw, user_info })
-        } else {
-            unsafe {
-                drop(Box::from_raw(
-                    user_info.as_ptr().cast::<Box<PickerDelegateCallback>>(),
-                ));
-            }
-            Err(unsafe {
+        match NonNull::new(raw) {
+            Some(raw) => Ok(PHPickerViewControllerDelegate { raw, context }),
+            None => Err(unsafe {
                 PhotoKitError::from_error_ptr(error, "register PHPickerViewControllerDelegate failed")
-            })
+            }),
         }
     }
 }
@@ -686,7 +682,7 @@ impl Drop for PHPickerViewController {
 /// RAII registration token for `PHPickerViewControllerDelegate`.
 pub struct PHPickerViewControllerDelegate {
     raw: NonNull<c_void>,
-    user_info: NonNull<c_void>,
+    context: PickerDelegateContext,
 }
 
 impl PHPickerViewControllerDelegate {
@@ -705,12 +701,8 @@ impl core::fmt::Debug for PHPickerViewControllerDelegate {
 
 impl Drop for PHPickerViewControllerDelegate {
     fn drop(&mut self) {
+        self.context.deactivate();
         unsafe { ffi::ph_picker_view_controller_unregister_delegate(self.raw.as_ptr()) };
-        unsafe {
-            drop(Box::from_raw(
-                self.user_info.as_ptr().cast::<Box<PickerDelegateCallback>>(),
-            ));
-        }
     }
 }
 
@@ -718,11 +710,6 @@ unsafe extern "C" fn picker_view_controller_delegate_trampoline(
     payload_json: *mut c_char,
     user_info: *mut c_void,
 ) {
-    if user_info.is_null() {
-        return;
-    }
-
-    let callback = &mut **user_info.cast::<Box<PickerDelegateCallback>>();
     let results = if payload_json.is_null() {
         Vec::new()
     } else if let Some(json) = take_string(payload_json) {
@@ -730,7 +717,7 @@ unsafe extern "C" fn picker_view_controller_delegate_trampoline(
     } else {
         Vec::new()
     };
-    catch_user_panic("picker_view_controller_delegate_trampoline", || {
-        callback(results);
+    let _ = PickerDelegateContext::with(user_info, "picker_view_controller_delegate_trampoline", |cell| {
+        cell.with(|callback| callback(results))
     });
 }

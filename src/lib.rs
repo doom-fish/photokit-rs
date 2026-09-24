@@ -79,6 +79,7 @@ pub mod persistent_change;
 pub mod picker;
 /// Wraps `PHPhotoLibrary` and observer registration APIs.
 pub mod photo_library;
+mod main_thread;
 mod private;
 /// Wraps `PHProject` and `PHProjectChangeRequest`.
 pub mod project;

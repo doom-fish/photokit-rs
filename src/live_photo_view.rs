@@ -1,7 +1,7 @@
 use core::ffi::{c_char, c_void};
 use std::ptr::{self, NonNull};
 
-use doom_fish_utils::panic_safe::catch_user_panic;
+use doom_fish_utils::callback_context::CallbackContext;
 use serde::{Deserialize, Serialize};
 
 use crate::error::PhotoKitError;
@@ -9,9 +9,11 @@ use crate::ffi;
 use crate::geometry::PHRect;
 use crate::image_manager::PHImageRequest;
 use crate::live_photo::PHLivePhotoResult;
+use crate::main_thread::MainThreadCell;
 use crate::private::{json_cstring, parse_json_ptr, take_string};
 
-type LivePhotoViewDelegateCallback = dyn Fn(PHLivePhotoViewDelegateEvent) -> bool + Send;
+type LivePhotoViewDelegateCallback = dyn Fn(PHLivePhotoViewDelegateEvent) -> bool;
+type LivePhotoViewDelegateContext = CallbackContext<MainThreadCell<Box<LivePhotoViewDelegateCallback>>>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -283,36 +285,28 @@ impl PHLivePhotoView {
         callback: F,
     ) -> Result<PHLivePhotoViewDelegate, PhotoKitError>
     where
-        F: Fn(PHLivePhotoViewDelegateEvent) -> bool + Send + 'static,
+        F: Fn(PHLivePhotoViewDelegateEvent) -> bool + 'static,
     {
-        let user_info = unsafe {
-            NonNull::new_unchecked(
-                Box::into_raw(Box::new(Box::new(callback) as Box<LivePhotoViewDelegateCallback>))
-                    .cast::<c_void>(),
-            )
-        };
+        let context = LivePhotoViewDelegateContext::new(MainThreadCell::new(
+            Box::new(callback) as Box<LivePhotoViewDelegateCallback>,
+            "PHLivePhotoViewDelegate",
+        )?);
         let mut error = ptr::null_mut();
         let raw = unsafe {
             ffi::ph_live_photo_view_register_delegate(
                 self.raw.as_ptr(),
                 live_photo_view_delegate_trampoline,
-                user_info.as_ptr(),
+                context.as_ptr(),
+                LivePhotoViewDelegateContext::RETAIN,
+                LivePhotoViewDelegateContext::RELEASE,
                 &raw mut error,
             )
         };
-        if let Some(raw) = NonNull::new(raw) {
-            Ok(PHLivePhotoViewDelegate { raw, user_info })
-        } else {
-            unsafe {
-                drop(Box::from_raw(
-                    user_info
-                        .as_ptr()
-                        .cast::<Box<LivePhotoViewDelegateCallback>>(),
-                ));
-            }
-            Err(unsafe {
+        match NonNull::new(raw) {
+            Some(raw) => Ok(PHLivePhotoViewDelegate { raw, context }),
+            None => Err(unsafe {
                 PhotoKitError::from_error_ptr(error, "register PHLivePhotoViewDelegate failed")
-            })
+            }),
         }
     }
 }
@@ -326,7 +320,7 @@ impl Drop for PHLivePhotoView {
 /// RAII registration token for `PHLivePhotoViewDelegate`.
 pub struct PHLivePhotoViewDelegate {
     raw: NonNull<c_void>,
-    user_info: NonNull<c_void>,
+    context: LivePhotoViewDelegateContext,
 }
 
 impl PHLivePhotoViewDelegate {
@@ -345,14 +339,8 @@ impl core::fmt::Debug for PHLivePhotoViewDelegate {
 
 impl Drop for PHLivePhotoViewDelegate {
     fn drop(&mut self) {
+        self.context.deactivate();
         unsafe { ffi::ph_live_photo_view_unregister_delegate(self.raw.as_ptr()) };
-        unsafe {
-            drop(Box::from_raw(
-                self.user_info
-                    .as_ptr()
-                    .cast::<Box<LivePhotoViewDelegateCallback>>(),
-            ));
-        }
     }
 }
 
@@ -360,30 +348,23 @@ unsafe extern "C" fn live_photo_view_delegate_trampoline(
     payload_json: *mut c_char,
     user_info: *mut c_void,
 ) -> i32 {
-    if user_info.is_null() {
-        return ffi::status::OK;
-    }
-
-    let callback = &mut **user_info.cast::<Box<LivePhotoViewDelegateCallback>>();
-    let event = if payload_json.is_null() {
-        PHLivePhotoViewDelegateEvent {
-            kind: PHLivePhotoViewDelegateEventKind::CanBegin,
-            playback_style: PHLivePhotoViewPlaybackStyle::Undefined,
-        }
-    } else if let Some(json) = take_string(payload_json) {
-        serde_json::from_str(&json).unwrap_or(PHLivePhotoViewDelegateEvent {
-            kind: PHLivePhotoViewDelegateEventKind::CanBegin,
-            playback_style: PHLivePhotoViewPlaybackStyle::Undefined,
-        })
-    } else {
-        PHLivePhotoViewDelegateEvent {
-            kind: PHLivePhotoViewDelegateEventKind::CanBegin,
-            playback_style: PHLivePhotoViewPlaybackStyle::Undefined,
-        }
+    let fallback = PHLivePhotoViewDelegateEvent {
+        kind: PHLivePhotoViewDelegateEventKind::CanBegin,
+        playback_style: PHLivePhotoViewPlaybackStyle::Undefined,
     };
-    let mut decision = true;
-    catch_user_panic("live_photo_view_delegate_trampoline", || {
-        decision = callback(event);
-    });
+    let event = if payload_json.is_null() {
+        fallback
+    } else if let Some(json) = take_string(payload_json) {
+        serde_json::from_str(&json).unwrap_or(fallback)
+    } else {
+        fallback
+    };
+    let decision = LivePhotoViewDelegateContext::with(
+        user_info,
+        "live_photo_view_delegate_trampoline",
+        |cell| cell.with(|callback| callback(event)),
+    )
+    .flatten()
+    .unwrap_or(true);
     i32::from(decision)
 }

@@ -22,6 +22,8 @@ extern "C" {
         controller: *mut c_void,
         callback: JsonCallback,
         user_info: *mut c_void,
+        context_retain: super::ContextCallback,
+        context_release: super::ContextCallback,
         out_error: *mut *mut c_char,
     ) -> *mut c_void;
     pub fn ph_picker_view_controller_unregister_delegate(delegate: *mut c_void);

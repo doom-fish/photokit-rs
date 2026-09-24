@@ -7,16 +7,29 @@ final class PKRPickerViewControllerDelegateBox: NSObject, PHPickerViewController
     weak var controller: PHPickerViewController?
     let callback: PKRPickerViewControllerDelegateCallback
     let userInfo: UnsafeMutableRawPointer?
+    private let contextRelease: PKRObserverContextCallback?
 
     init(
         controller: PHPickerViewController,
         callback: @escaping PKRPickerViewControllerDelegateCallback,
-        userInfo: UnsafeMutableRawPointer?
+        userInfo: UnsafeMutableRawPointer?,
+        contextRetain: PKRObserverContextCallback?,
+        contextRelease: PKRObserverContextCallback?
     ) {
         self.controller = controller
         self.callback = callback
         self.userInfo = userInfo
+        self.contextRelease = contextRelease
         super.init()
+        if let userInfo {
+            contextRetain?(userInfo)
+        }
+    }
+
+    deinit {
+        if let userInfo {
+            contextRelease?(userInfo)
+        }
     }
 
     func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
@@ -38,6 +51,8 @@ public func ph_picker_view_controller_register_delegate(
     _ controller: UnsafeMutableRawPointer?,
     _ callback: @escaping PKRPickerViewControllerDelegateCallback,
     _ userInfo: UnsafeMutableRawPointer?,
+    _ contextRetain: @escaping PKRObserverContextCallback,
+    _ contextRelease: @escaping PKRObserverContextCallback,
     _ outError: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> UnsafeMutableRawPointer? {
     guard let controller else {
@@ -49,7 +64,9 @@ public func ph_picker_view_controller_register_delegate(
     let delegate = PKRPickerViewControllerDelegateBox(
         controller: box.controller,
         callback: callback,
-        userInfo: userInfo
+        userInfo: userInfo,
+        contextRetain: contextRetain,
+        contextRelease: contextRelease
     )
     box.controller.delegate = delegate
     return pkrRetain(delegate)
