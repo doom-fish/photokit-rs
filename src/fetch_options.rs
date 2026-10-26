@@ -131,7 +131,7 @@ mod tests {
         let options = PHFetchOptions::default();
 
         assert!(options.predicate.is_none());
-        assert!(options.sort_descriptors.is_empty());
+        assert_eq!(options.sort_descriptors.len(), 0);
         assert!(!options.include_hidden_assets);
         assert!(!options.include_all_burst_assets);
         assert!(options.include_asset_source_types.is_none());
@@ -175,12 +175,10 @@ mod tests {
         assert!(options.include_hidden_assets);
         assert!(options.include_all_burst_assets);
         assert_eq!(options.include_asset_source_types, Some(source_types));
-        assert!(
-            options
-                .include_asset_source_types
-                .expect("asset source types set")
-                .contains(PHAssetSourceType::USER_LIBRARY)
-        );
+        assert!(options
+            .include_asset_source_types
+            .expect("asset source types set")
+            .contains(PHAssetSourceType::USER_LIBRARY));
     }
 
     #[test]

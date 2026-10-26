@@ -2,7 +2,7 @@ use photokit::prelude::*;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let picker_filter = PHPickerFilter::images();
-    assert!(!picker_filter.description()?.is_empty());
+    assert_ne!(picker_filter.description()?, "");
 
     let configuration = PHPickerConfiguration::new()
         .set_selection(PHPickerConfigurationSelection::Ordered)

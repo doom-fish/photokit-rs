@@ -18,14 +18,14 @@ fn fetch_with_predicate(predicate: &str) -> String {
 #[test]
 fn predicate_format_specifiers_are_rejected_instead_of_reading_varargs() {
     for predicate in ["localIdentifier == %@", "%K == 1", "pixelWidth > %d"] {
-        assert!(!fetch_with_predicate(predicate).is_empty());
+        assert_ne!(fetch_with_predicate(predicate), "");
     }
 }
 
 #[test]
 fn malformed_predicates_are_rejected() {
-    assert!(!fetch_with_predicate("mediaType ==").is_empty());
-    assert!(!fetch_with_predicate("((mediaType == 1)").is_empty());
+    assert_ne!(fetch_with_predicate("mediaType =="), "");
+    assert_ne!(fetch_with_predicate("((mediaType == 1)"), "");
 }
 
 #[test]
@@ -33,10 +33,13 @@ fn unsupported_fetch_keys_are_rejected_when_the_library_is_available() {
     if common::authorized_library().is_none() {
         return;
     }
-    assert!(!fetch_with_predicate("photokitNoSuchKey == 1").is_empty());
+    assert_ne!(fetch_with_predicate("photokitNoSuchKey == 1"), "");
 
     let unsupported_sort = PHFetchOptions::default()
         .with_sort_descriptor(PHSortDescriptor::new("photokitNoSuchKey", true));
-    assert!(!caught_exception(PHAsset::fetch(&unsupported_sort)).is_empty());
-    assert!(!caught_exception(PHAssetCollection::fetch(&unsupported_sort)).is_empty());
+    assert_ne!(caught_exception(PHAsset::fetch(&unsupported_sort)), "");
+    assert_ne!(
+        caught_exception(PHAssetCollection::fetch(&unsupported_sort)),
+        ""
+    );
 }

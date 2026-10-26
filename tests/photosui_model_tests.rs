@@ -14,7 +14,9 @@ fn sample_region_of_interest() -> PHProjectRegionOfInterest {
     }
 }
 
-fn sample_asset_element(regions_of_interest: Vec<PHProjectRegionOfInterest>) -> PHProjectAssetElement {
+fn sample_asset_element(
+    regions_of_interest: Vec<PHProjectRegionOfInterest>,
+) -> PHProjectAssetElement {
     PHProjectAssetElement {
         element: PHProjectElement {
             weight: 1.0,
@@ -114,14 +116,18 @@ fn photosui_picker_helpers_round_trip() -> Result<(), Box<dyn std::error::Error>
         PHPickerFilter::live_photos(),
     ]);
     let description = filter.description()?;
-    assert!(!description.is_empty());
+    assert_ne!(description, "");
 
     let picker_config = PHPickerConfiguration::new()
         .set_selection_limit(2)
         .set_selection(PHPickerConfigurationSelection::Ordered)
         .set_filter(filter)
-        .set_edges_without_content_margins(PHDirectionalRectEdge::TOP | PHDirectionalRectEdge::BOTTOM)
-        .set_disabled_capabilities(PHPickerCapabilities::SEARCH | PHPickerCapabilities::SELECTION_ACTIONS);
+        .set_edges_without_content_margins(
+            PHDirectionalRectEdge::TOP | PHDirectionalRectEdge::BOTTOM,
+        )
+        .set_disabled_capabilities(
+            PHPickerCapabilities::SEARCH | PHPickerCapabilities::SELECTION_ACTIONS,
+        );
     assert_eq!(picker_config.selection_limit, 2);
     assert!(picker_config
         .edges_without_content_margins
@@ -193,7 +199,9 @@ fn photosui_project_extension_helpers_round_trip() {
         .set_subtype_descriptions(vec![PHProjectTypeDescription::new("book.small", "Small")])
         .set_can_provide_subtypes(true);
     assert_eq!(type_description.image_tiff_data(), Some(b"hello".to_vec()));
-    assert!(type_description.localized_attributed_description_rtf_data().is_some());
+    assert!(type_description
+        .localized_attributed_description_rtf_data()
+        .is_some());
 
     let footer_calls = Arc::new(AtomicUsize::new(0));
     let footer_calls_clone = Arc::clone(&footer_calls);
@@ -206,7 +214,9 @@ fn photosui_project_extension_helpers_round_trip() {
         },
     );
     assert_eq!(data_source.subtypes_for_project_type("book").len(), 1);
-    assert!(data_source.type_description_for_project_type("book").is_some());
+    assert!(data_source
+        .type_description_for_project_type("book")
+        .is_some());
     assert_eq!(
         data_source.footer_text_for_subtypes_of_project_type("book"),
         Some("Footer".to_owned())

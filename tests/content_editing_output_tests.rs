@@ -10,6 +10,6 @@ fn content_editing_output_smoke() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     };
     let output = input.create_content_editing_output()?;
-    assert!(!output.rendered_content_url.is_empty());
+    assert_ne!(output.rendered_content_url, "");
     Ok(())
 }
