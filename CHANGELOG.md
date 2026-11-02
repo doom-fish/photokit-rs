@@ -5,6 +5,19 @@ All notable changes to `photokit` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- The async functions that call `PHPhotoLibrary.performChanges` return an error
+  when Photos reports a failure without an error. Before, they returned a
+  success. These are `AsyncPHPhotoLibrary::perform_asset_change`,
+  `perform_collection_change` and `perform_collection_list_change`, and the
+  `perform` functions of the async change request types.
+- `AsyncPHImageManager::request_image_data` returns an error when Photos gives
+  no data and no error, and does not set the cancel flag or the iCloud flag.
+  Before, it returned a result with empty data.
+
 ## [0.5.2] - 2026-10-26
 
 ### Fixed

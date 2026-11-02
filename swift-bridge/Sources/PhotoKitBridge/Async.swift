@@ -58,9 +58,11 @@ func pkrPerformChanges(
         } catch {
             changeError = error
         }
-    }) { _, error in
+    }) { success, error in
         if let error = changeError ?? error {
             error.localizedDescription.withCString { cb(nil, $0, ctx) }
+        } else if !success {
+            "Photos reported a failure without an error".withCString { cb(nil, $0, ctx) }
         } else if let json = try? pkrEncodeJSON(
             PKRChangeRequestPerformResultPayload(
                 placeholderLocalIdentifier: placeholderLocalIdentifier
@@ -227,6 +229,10 @@ public func ph_image_manager_request_image_data_async(
                 requestID: pkrRequestID(from: info),
                 error: pkrResultErrorPayload(from: info, key: PHImageErrorKey)
             )
+            if data == nil && !payload.cancelled && !payload.isInCloud && payload.error == nil {
+                "Photos returned neither a result nor an error".withCString { cb(nil, $0, ctx) }
+                return
+            }
             if let json = try? pkrEncodeJSON(payload) {
                 json.withCString { cb($0, nil, ctx) }
             } else {
