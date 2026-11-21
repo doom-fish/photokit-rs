@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-11-21
+
+### Changed
+
+- Asset export installs the completed file only if the destination name is free. A timeout or write error preserves the destination.
+- A photo authorization timeout returns before the bridge reads the callback result.
+
 ## [0.5.3] - 2026-11-02
 
 ### Fixed

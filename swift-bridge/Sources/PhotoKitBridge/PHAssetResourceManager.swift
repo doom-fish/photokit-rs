@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import Photos
 
@@ -76,9 +77,25 @@ final class PKRResourceFileWriter {
 }
 
 struct PKRAssetResourceWriteResultPayload: Codable {
-    var fileURL: String
-    var success: Bool
-    var error: PKRErrorPayload?
+    let fileURL: String
+    let success: Bool
+    let error: PKRErrorPayload?
+
+    init(destination: URL, failure: Error?) {
+        fileURL = destination.absoluteString
+        success = failure == nil
+        error = failure.map(pkrErrorPayload)
+    }
+}
+
+private func pkrExportResult(at url: URL, failure: NSError?) throws -> UnsafeMutablePointer<CChar> {
+    let payload = PKRAssetResourceWriteResultPayload(destination: url, failure: failure)
+    guard let encoded = pkrCString(try pkrEncodeJSON(payload)) else { throw pkrOutputError(ENOMEM, at: url) }
+    return encoded
+}
+
+private func pkrOutputError(_ code: Int32, at url: URL) -> NSError {
+    NSError(domain: NSPOSIXErrorDomain, code: Int(code), userInfo: [NSFilePathErrorKey: url.path])
 }
 
 func pkrRequestAssetResource(from payload: PKRAssetResourcePayload) throws -> PHAssetResource {
@@ -170,18 +187,22 @@ public func ph_asset_resource_manager_write_data_json(
         let resource = try pkrRequestAssetResource(from: resourcePayload)
         let destinationURL = try pkrFileURL(String(cString: fileURL))
 
-        let descriptor = open(destinationURL.path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0o644)
+        var info = stat()
+        let existing = lstat(destinationURL.path, &info) == 0 ? EEXIST : errno
+        if existing != ENOENT {
+            return try pkrExportResult(at: destinationURL, failure: pkrOutputError(existing, at: destinationURL))
+        }
+        let staging = try FileManager.default.url(
+            for: .itemReplacementDirectory, in: .userDomainMask, appropriateFor: destinationURL, create: true
+        )
+        let file = staging.appendingPathComponent("resource")
+        defer { _ = rmdir(staging.path) }
+        let descriptor = open(file.path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0o644)
         guard descriptor >= 0 else {
-            let code = Int(errno)
-            let error = NSError(domain: NSPOSIXErrorDomain, code: code, userInfo: [NSFilePathErrorKey: destinationURL.path])
-            let payload = PKRAssetResourceWriteResultPayload(
-                fileURL: destinationURL.absoluteString,
-                success: false,
-                error: pkrErrorPayload(from: error)
-            )
-            return pkrCString(try pkrEncodeJSON(payload))
+            return try pkrExportResult(at: destinationURL, failure: pkrOutputError(errno, at: destinationURL))
         }
 
+        defer { _ = unlink(file.path) }
         let writer = PKRResourceFileWriter(handle: FileHandle(fileDescriptor: descriptor, closeOnDealloc: true))
         let manager = PHAssetResourceManager.default()
         let slot = PKRResultSlot<NSError?>()
@@ -194,21 +215,15 @@ public func ph_asset_resource_manager_write_data_json(
         guard let result = slot.wait(timeoutMs: timeoutMs) else {
             manager.cancelDataRequest(requestID)
             _ = writer.close()
-            try? FileManager.default.removeItem(at: destinationURL)
             throw pkrError("asset resource write timed out")
         }
 
         let closeError = writer.close()
-        let requestError = try result.get() ?? closeError.map { $0 as NSError }
-        if requestError != nil {
-            try? FileManager.default.removeItem(at: destinationURL)
+        var requestError = try result.get() ?? closeError.map { $0 as NSError }
+        if requestError == nil, renamex_np(file.path, destinationURL.path, UInt32(RENAME_EXCL)) != 0 {
+            requestError = pkrOutputError(errno, at: destinationURL)
         }
-        let payload = PKRAssetResourceWriteResultPayload(
-            fileURL: destinationURL.absoluteString,
-            success: requestError == nil,
-            error: requestError.map(pkrErrorPayload)
-        )
-        return pkrCString(try pkrEncodeJSON(payload))
+        return try pkrExportResult(at: destinationURL, failure: requestError)
     } catch {
         pkrSetError(outError, error)
         return nil

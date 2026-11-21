@@ -214,7 +214,10 @@ public func ph_request_authorization_for_access_level(
         }
     }
 
-    _ = semaphore.wait(timeout: .now() + .seconds(30))
+    guard semaphore.wait(timeout: .now() + .seconds(30)) == .success else {
+        pkrSetMessageError(outError, message: "photo authorization request timed out")
+        return Int32(clamping: PHAuthorizationStatus.notDetermined.rawValue)
+    }
     if status == .notDetermined {
         pkrSetMessageError(outError, message: "photo authorization did not resolve")
     }

@@ -83,7 +83,7 @@ See [`async_api`](src/async_api.rs) for the full API surface.
 - `PHAsset`, `PHCollection`, `PHAssetCollection`, and `PHCollectionList` fetch helpers with typed subtype/source/resource wrappers.
 - `PHChangeRequest` builders for asset, album, folder, and project mutation flows.
 - `PHImageManager` request handles for images, image data, live photos and video requests, and `PHCachingImageManager` start/stop caching. Requests through a caching manager are not bridged, so nothing in this crate reads its cache yet.
-- `PHAssetResourceManager` transfer helpers for reading or writing asset resources.
+- `PHAssetResourceManager` transfers asset resources. File export installs the complete file only if the destination name is free. An error or timeout leaves the destination unchanged.
 - `PHContentEditingInput` / `PHContentEditingOutput` plus `PHLivePhotoEditingContext` for non-destructive editing workflows.
 - `PHCloudIdentifier` batch lookup helpers and richer Photos-specific error metadata.
 
