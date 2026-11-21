@@ -2,13 +2,13 @@
 
 Safe Rust bindings for Apple's [Photos](https://developer.apple.com/documentation/photos) framework on macOS.
 
-> **Status:** 0.5.0 is a soundness release. Change requests return errors instead of aborting the process, callback contexts outlive in-flight PhotoKit calls, image requests complete on PhotoKit's final result, and fetch predicates can no longer read undefined memory. See the [CHANGELOG](CHANGELOG.md) for the breaking changes.
+> **Status:** Version 0.5.4 preserves the destination file if an asset export times out or fails. See the [changelog](CHANGELOG.md) for earlier changes to requests and callbacks.
 
 ## Installation
 
 ```toml
 [dependencies]
-photokit = "0.5"
+photokit = "0.5.4"
 ```
 
 ## Requirements
@@ -60,7 +60,7 @@ Enable the `async` feature to access non-blocking wrappers for Photos.framework 
 
 ```toml
 [dependencies]
-photokit = { version = "0.5", features = ["async"] }
+photokit = { version = "0.5.4", features = ["async"] }
 ```
 
 ```rust
